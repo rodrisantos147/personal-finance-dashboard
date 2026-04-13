@@ -29,6 +29,10 @@ Código: `src/lib/demo-data.ts` (`buildDemoSnapshot`, `buildDemoExportJson`).
 
 En **Datos** → **Importar desde CSV**: subí el archivo o pegá el texto. Se detectan columnas típicas (**Fecha**, **Descripción**, **Débito** / **Crédito**, o **Monto**). Podés mezclar varios meses en un solo archivo. Si el banco exporta una sola columna de importe, usá signo (negativo = egreso) o indicá que todo es egreso/ingreso. La categoría y el medio de pago por defecto se aplican a todo el lote (después podés editar o borrar filas en Movimientos).
 
+### PDF (Itaú y similares)
+
+En **Datos** → **Importar PDF**: se lee el texto en el navegador (no sube el archivo a un servidor). El formato de cada PDF varía: si no detecta movimientos, usá la exportación **CSV/Excel** del banco o la importación CSV pegando la tabla. Los PDFs escaneados (imagen) no pueden leerse sin OCR.
+
 ## Desarrollo
 
 ```bash

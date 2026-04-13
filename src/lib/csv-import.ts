@@ -102,7 +102,8 @@ export function parseMoneyARAbsolute(raw: string): number {
   return Number.isFinite(n) ? Math.abs(n) : NaN;
 }
 
-function parseDateFlexible(raw: string): Date | null {
+/** Exportado para reutilizar en PDF (Itaú y similares). */
+export function parseDateFlexible(raw: string): Date | null {
   const t = raw.trim();
   if (!t) return null;
   const m1 = t.match(

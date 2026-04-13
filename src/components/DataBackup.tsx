@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { CsvImport } from "@/components/CsvImport";
+import { PdfImport } from "@/components/PdfImport";
 import { buildDemoExportJson } from "@/lib/demo-data";
 import { useFinanceStore } from "@/lib/store";
 
@@ -68,6 +69,8 @@ export function DataBackup() {
       </section>
 
       <CsvImport />
+
+      <PdfImport />
 
       <section className="rounded-xl border border-zinc-800 bg-zinc-900/40 p-6">
         <h2 className="text-lg font-medium text-white">Saldo inicial</h2>
