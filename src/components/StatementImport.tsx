@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { parseBankStatementPdfText } from "@/lib/bank-pdf-parse";
 import {
   parseBankCsv,
@@ -8,7 +8,7 @@ import {
   type CsvImportResult,
   type SingleAmountConvention,
 } from "@/lib/csv-import";
-import { formatMoneyWithSettings, resolveDefaultCurrency } from "@/lib/format";
+import { formatMoneyWithSettings } from "@/lib/format";
 import { inferOmitFromPeriodSummary } from "@/lib/finance";
 import { extractTextFromPdfFile } from "@/lib/pdf-extract";
 import { useFinanceStore } from "@/lib/store";
@@ -73,17 +73,9 @@ export function StatementImport() {
   const [catIncome, setCatIncome] = useState("Ingreso");
   const [payExpense, setPayExpense] = useState<PaymentMethod>("debit");
   const [payIncome, setPayIncome] = useState<PaymentMethod>("transfer");
-  const [importCurrency, setImportCurrency] = useState<CurrencyCode>(() =>
-    resolveDefaultCurrency(settings),
-  );
-
-  useEffect(() => {
-    setImportCurrency(resolveDefaultCurrency(settings));
-  }, [settings.defaultCurrency, settings.currency]);
-
   const parsed = useMemo(
-    () => pickParseResult(rawText, preferPdf, convention, importCurrency),
-    [rawText, preferPdf, convention, importCurrency],
+    () => pickParseResult(rawText, preferPdf, convention, "UYU"),
+    [rawText, preferPdf, convention],
   );
 
   const previewRows = parsed.ok ? parsed.rows : [];
@@ -128,7 +120,7 @@ export function StatementImport() {
       rows.map((r) => ({
         type: r.type,
         amount: r.amount,
-        currency: r.currency ?? importCurrency,
+        currency: r.currency ?? "UYU",
         category: r.type === "expense" ? catExpense : catIncome,
         date: r.date,
         paymentMethod: r.type === "expense" ? payExpense : payIncome,
@@ -199,25 +191,13 @@ export function StatementImport() {
 
       <details className="mt-4 rounded-lg border border-zinc-800 bg-zinc-950/40 p-3">
         <summary className="cursor-pointer text-sm text-zinc-400">
-          Opciones (moneda, categorías, débito/crédito)
+          Opciones (categorías, débito/crédito)
         </summary>
+        <p className="mt-2 text-xs text-zinc-600">
+          Moneda por defecto del CSV: <strong className="text-zinc-500">pesos uruguayos</strong>
+          . Los importes en USD en extractos se detectan por columna o texto.
+        </p>
         <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          <label className="flex flex-col gap-1 text-sm">
-            <span className="text-zinc-500">
-              Moneda si el archivo no la indica
-            </span>
-            <select
-              value={importCurrency}
-              onChange={(e) =>
-                setImportCurrency(e.target.value as CurrencyCode)
-              }
-              className="rounded-lg border border-zinc-700 bg-zinc-950 px-3 py-2 text-white"
-            >
-              <option value="UYU">UYU ($)</option>
-              <option value="USD">USD (US$)</option>
-              <option value="EUR">EUR (€)</option>
-            </select>
-          </label>
           <label className="flex flex-col gap-1 text-sm">
             <span className="text-zinc-500">Monto único (sin déb./créd.)</span>
             <select
@@ -347,10 +327,10 @@ export function StatementImport() {
                       {r.description}
                     </td>
                     <td className="px-2 py-1.5 text-zinc-500">
-                      {r.currency ?? importCurrency}
+                      {r.currency ?? "UYU"}
                     </td>
                     <td className="px-2 py-1.5 text-right tabular-nums text-zinc-200">
-                      {fmtPreview(r.amount, r.currency ?? importCurrency)}
+                      {fmtPreview(r.amount, r.currency ?? "UYU")}
                     </td>
                   </tr>
                 ))}

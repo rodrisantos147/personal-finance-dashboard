@@ -84,9 +84,9 @@ export function FinancialStateCard({
             </ul>
           )}
           <p className="mt-3 text-[11px] text-zinc-600">
-            Ingresos, gastos y proyección se interpretan según la{" "}
-            <strong className="font-medium text-zinc-500">moneda del resumen</strong>{" "}
-            y el período arriba. La referencia UYU+USD usa tu tipo de cambio en Datos.
+            Ingresos, gastos y proyección están en{" "}
+            <strong className="font-medium text-zinc-500">pesos uruguayos</strong>
+            ; los movimientos en USD se unifican con el tipo de cambio en Datos.
           </p>
         </div>
       </div>

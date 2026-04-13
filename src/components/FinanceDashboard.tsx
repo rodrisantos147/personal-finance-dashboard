@@ -18,7 +18,7 @@ import {
   Settings2,
   Table2,
 } from "lucide-react";
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import {
   Bar,
   BarChart,
@@ -43,12 +43,7 @@ import {
   sumIncomeExpenseForReport,
   transactionIncomeContributionInReport,
 } from "@/lib/finance";
-import {
-  formatMoneyWithSettings,
-  resolveDefaultCurrency,
-  txCurrency,
-} from "@/lib/format";
-import type { CurrencyCode } from "@/lib/types";
+import { formatMoneyWithSettings } from "@/lib/format";
 import { buildTips } from "@/lib/tips";
 import { useFinanceStore } from "@/lib/store";
 import { cn } from "@/lib/cn";
@@ -69,11 +64,8 @@ function fmtDeltaPct(n: number) {
   return `${sign}${n.toFixed(1)}%`;
 }
 
-const REPORT_CURRENCIES: { id: CurrencyCode; label: string }[] = [
-  { id: "UYU", label: "Pesos (UYU)" },
-  { id: "USD", label: "Dólares (USD)" },
-  { id: "EUR", label: "Euros (EUR)" },
-];
+/** Resumen, gráficos y KPI siempre en pesos uruguayos (incluye USD × TC referencia). */
+const REPORT_CURRENCY = "UYU" as const;
 
 type RangeMode = "month" | "custom" | "rolling";
 type RollingPreset = 30 | 60 | 90 | 365;
@@ -91,9 +83,6 @@ export function FinanceDashboard() {
   const creditCards = useFinanceStore((s) => s.creditCards);
   const recurringIncomes = useFinanceStore((s) => s.recurringIncomes);
   const [tab, setTab] = useState<Tab>("overview");
-  const [reportCurrency, setReportCurrency] = useState<CurrencyCode>(() =>
-    resolveDefaultCurrency(settings),
-  );
   const [periodMonth, setPeriodMonth] = useState(() => startOfMonth(new Date()));
   const [rangeMode, setRangeMode] = useState<RangeMode>("month");
   const [rollingDays, setRollingDays] = useState<RollingPreset>(30);
@@ -131,15 +120,9 @@ export function FinanceDashboard() {
     [transactions, settings],
   );
 
-  useEffect(() => {
-    if (!usedCurrencies.includes(reportCurrency)) {
-      setReportCurrency(usedCurrencies[0] ?? resolveDefaultCurrency(settings));
-    }
-  }, [usedCurrencies, reportCurrency, settings]);
-
   const { income, expense } = useMemo(
-    () => sumIncomeExpenseForReport(slice, settings, reportCurrency),
-    [slice, settings, reportCurrency],
+    () => sumIncomeExpenseForReport(slice, settings, REPORT_CURRENCY),
+    [slice, settings],
   );
   const net = income - expense;
 
@@ -149,23 +132,18 @@ export function FinanceDashboard() {
         const contribution = transactionIncomeContributionInReport(
           t,
           settings,
-          reportCurrency,
+          REPORT_CURRENCY,
           slice,
         );
         return {
           id: t.id,
           desc: (t.description || "Sin detalle").slice(0, 56),
           contribution,
-          native: formatMoneyWithSettings(
-            t.amount,
-            settings,
-            txCurrency(t, settings),
-          ),
         };
       })
       .filter((x) => x.contribution > 0)
       .sort((a, b) => b.contribution - a.contribution);
-  }, [slice, settings, reportCurrency]);
+  }, [slice, settings]);
 
   const referenceTotals = useMemo(() => {
     const fx = settings.referenceUyuPerUsd;
@@ -180,8 +158,8 @@ export function FinanceDashboard() {
   }, [slice, settings]);
 
   const { pendingIncome, pendingExpense } = useMemo(
-    () => pendingTotals(transactions, settings, reportCurrency),
-    [transactions, settings, reportCurrency],
+    () => pendingTotals(transactions, settings, REPORT_CURRENCY),
+    [transactions, settings, REPORT_CURRENCY],
   );
   const horizon = endOfMonth(new Date());
   const future = useMemo(
@@ -191,19 +169,19 @@ export function FinanceDashboard() {
         recurringIncomes,
         horizon,
         settings,
-        reportCurrency,
+        REPORT_CURRENCY,
       ),
-    [transactions, recurringIncomes, horizon, settings, reportCurrency],
+    [transactions, recurringIncomes, horizon, settings, REPORT_CURRENCY],
   );
 
   const dv = useMemo(
-    () => debitVsCreditForReport(slice, settings, reportCurrency),
-    [slice, settings, reportCurrency],
+    () => debitVsCreditForReport(slice, settings, REPORT_CURRENCY),
+    [slice, settings, REPORT_CURRENCY],
   );
 
   const usingFallbackFx = useMemo(
-    () => isUsingFallbackReferenceUyuPerUsd(settings, slice, reportCurrency),
-    [settings, slice, reportCurrency],
+    () => isUsingFallbackReferenceUyuPerUsd(settings, slice, REPORT_CURRENCY),
+    [settings, slice, REPORT_CURRENCY],
   );
   const creditShare =
     expense > 0 ? dv.credit / expense : 0;
@@ -216,12 +194,12 @@ export function FinanceDashboard() {
         from,
         to,
         settings,
-        reportCurrency,
+        REPORT_CURRENCY,
         {
           alignPreviousToCalendarMonth: rangeMode === "month",
         },
       ),
-    [transactions, from, to, settings, reportCurrency, rangeMode],
+    [transactions, from, to, settings, REPORT_CURRENCY, rangeMode],
   );
 
   const chartAnchor = useMemo(() => {
@@ -235,10 +213,10 @@ export function FinanceDashboard() {
         transactions,
         6,
         settings,
-        reportCurrency,
+        REPORT_CURRENCY,
         chartAnchor,
       ),
-    [transactions, settings, reportCurrency, chartAnchor],
+    [transactions, settings, REPORT_CURRENCY, chartAnchor],
   );
 
   const barChartScaleNote = useMemo(() => {
@@ -263,7 +241,7 @@ export function FinanceDashboard() {
         pendingIncome,
         pendingExpense,
         futureIncomeEstimate: future.total,
-        futureIncomeCurrency: reportCurrency,
+        futureIncomeCurrency: REPORT_CURRENCY,
         locale: settings.locale,
         cards: creditCards,
       }),
@@ -274,7 +252,7 @@ export function FinanceDashboard() {
       pendingIncome,
       pendingExpense,
       future.total,
-      reportCurrency,
+      REPORT_CURRENCY,
       settings.locale,
       creditCards,
     ],
@@ -284,7 +262,7 @@ export function FinanceDashboard() {
     income - expense + pendingIncome - pendingExpense + future.total;
 
   const fmt = (n: number) =>
-    formatMoneyWithSettings(n, settings, reportCurrency);
+    formatMoneyWithSettings(n, settings, REPORT_CURRENCY);
 
   const fmtUyu = (n: number) => formatMoneyWithSettings(n, settings, "UYU");
 
@@ -555,35 +533,15 @@ export function FinanceDashboard() {
           />
 
           <div className="flex flex-col gap-2 rounded-xl border border-zinc-800 bg-zinc-900/30 px-4 py-3">
-            <div className="flex flex-wrap items-center gap-3">
-              <span className="text-xs font-medium text-zinc-500">
-                Moneda del resumen y gráficos
-              </span>
-              <select
-                value={reportCurrency}
-                onChange={(e) =>
-                  setReportCurrency(e.target.value as CurrencyCode)
-                }
-                className="rounded-lg border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm text-white"
-              >
-                {REPORT_CURRENCIES.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.label}
-                  </option>
-                ))}
-              </select>
-              <span className="text-xs text-zinc-600">
-                Con datos: {usedCurrencies.join(", ") || "—"}
-              </span>
-            </div>
-            {reportCurrency !== "UYU" && (
-              <p className="text-xs text-zinc-500">
-                Los totales del resumen están en la moneda elegida arriba. Para
-                verlos en{" "}
-                <strong className="text-zinc-400">pesos uruguayos</strong>,
-                seleccioná <strong className="text-zinc-400">Pesos (UYU)</strong>.
-              </p>
-            )}
+            <p className="text-xs text-zinc-400">
+              <strong className="text-zinc-300">Todo el resumen y los gráficos</strong>{" "}
+              están en <strong className="text-zinc-300">pesos uruguayos</strong>{" "}
+              (los movimientos en USD se convierten con el tipo de referencia en
+              Datos, o 42 si no cargaste uno).
+            </p>
+            <p className="text-xs text-zinc-600">
+              Monedas en tus datos: {usedCurrencies.join(", ") || "—"}
+            </p>
             {usingFallbackFx && (
               <p className="text-xs leading-relaxed text-amber-100/90">
                 Mezclamos pesos y dólares con un tipo de cambio referencia{" "}
@@ -621,7 +579,6 @@ export function FinanceDashboard() {
                   </p>
                   {settings.referenceUyuPerUsd != null &&
                     settings.referenceUyuPerUsd > 0 &&
-                    reportCurrency === "UYU" &&
                     usedCurrencies.includes("USD") && (
                       <p>
                         Tenés ingresos o movimientos en USD: en este total en pesos
@@ -658,9 +615,6 @@ export function FinanceDashboard() {
                             </span>
                             <span className="shrink-0 tabular-nums text-zinc-400">
                               {fmt(row.contribution)}
-                              <span className="ml-1 text-[10px] text-zinc-600">
-                                ({row.native})
-                              </span>
                             </span>
                           </li>
                         ))}
@@ -802,12 +756,11 @@ export function FinanceDashboard() {
             </h2>
             <p className="mb-3 text-xs text-zinc-600">
               Todos los montos en{" "}
-              <strong className="text-zinc-400">{reportCurrency}</strong>
+              <strong className="text-zinc-400">pesos uruguayos</strong>
               {settings.referenceUyuPerUsd != null &&
-              settings.referenceUyuPerUsd > 0 &&
-              (reportCurrency === "UYU" || reportCurrency === "USD")
-                ? " (ingresos y gastos en UYU y USD combinados con el tipo de referencia en Datos)."
-                : "."}{" "}
+              settings.referenceUyuPerUsd > 0
+                ? " (UYU y USD del período combinados con el tipo de referencia en Datos)."
+                : " (solo filas en pesos si no definís tipo de cambio; USD no se suman en pesos hasta que cargues uno en Datos)."}{" "}
               La última barra es el mes que termina en{" "}
               {chartAnchor.toLocaleDateString("es-UY", {
                 month: "long",

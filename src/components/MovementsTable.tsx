@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { filterByDateRange } from "@/lib/finance";
-import { formatMoneyWithSettings, resolveDefaultCurrency, txCurrency } from "@/lib/format";
+import { formatMoneyWithSettings, txCurrency } from "@/lib/format";
 import { useFinanceStore } from "@/lib/store";
 import type { CurrencyCode, PaymentMethod, TransactionType } from "@/lib/types";
 import { cn } from "@/lib/cn";
@@ -12,12 +12,6 @@ const METHODS: { id: PaymentMethod; label: string }[] = [
   { id: "credit", label: "Crédito" },
   { id: "cash", label: "Efectivo" },
   { id: "transfer", label: "Transferencia" },
-];
-
-const CURS: { id: CurrencyCode; label: string }[] = [
-  { id: "UYU", label: "UYU ($)" },
-  { id: "USD", label: "USD (US$)" },
-  { id: "EUR", label: "EUR (€)" },
 ];
 
 export function MovementsTable({
@@ -46,14 +40,6 @@ export function MovementsTable({
   const [isPending, setIsPending] = useState(false);
   const [omitFromPeriodSummary, setOmitFromPeriodSummary] = useState(false);
   const [newCat, setNewCat] = useState("");
-  const [txCur, setTxCur] = useState<CurrencyCode>(() =>
-    resolveDefaultCurrency(settings),
-  );
-
-  useEffect(() => {
-    setTxCur(resolveDefaultCurrency(settings));
-  }, [settings.defaultCurrency, settings.currency]);
-
   const slice = useMemo(
     () => filterByDateRange(transactions, periodFrom, periodTo),
     [transactions, periodFrom, periodTo],
@@ -70,7 +56,7 @@ export function MovementsTable({
     addTransaction({
       type,
       amount: n,
-      currency: txCur,
+      currency: "UYU",
       category: type === "expense" ? category : "Ingreso",
       date: new Date(date).toISOString(),
       paymentMethod: type === "expense" ? paymentMethod : "transfer",
@@ -114,20 +100,12 @@ export function MovementsTable({
               className="rounded-lg border border-zinc-700 bg-zinc-950 px-3 py-2 text-white"
             />
           </label>
-          <label className="flex flex-col gap-1 text-sm">
+          <div className="flex flex-col gap-1 text-sm">
             <span className="text-zinc-400">Moneda</span>
-            <select
-              value={txCur}
-              onChange={(e) => setTxCur(e.target.value as CurrencyCode)}
-              className="rounded-lg border border-zinc-700 bg-zinc-950 px-3 py-2 text-white"
-            >
-              {CURS.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.label}
-                </option>
-              ))}
-            </select>
-          </label>
+            <span className="rounded-lg border border-zinc-800 bg-zinc-950/80 px-3 py-2 text-zinc-300">
+              Pesos uruguayos (UYU)
+            </span>
+          </div>
           <label className="flex flex-col gap-1 text-sm">
             <span className="text-zinc-400">Fecha</span>
             <input

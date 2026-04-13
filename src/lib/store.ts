@@ -47,10 +47,7 @@ function uid() {
 function scrubSettings(settings: AppSettings): AppSettings {
   const out = { ...settings };
   delete (out as Record<string, unknown>).treatArsAsUyu;
-  out.defaultCurrency = normalizeStoredCurrency(
-    String(out.defaultCurrency ?? "UYU"),
-    "UYU",
-  );
+  out.defaultCurrency = "UYU";
   return out;
 }
 

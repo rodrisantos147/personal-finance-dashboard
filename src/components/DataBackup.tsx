@@ -165,22 +165,9 @@ export function DataBackup() {
       <section className="rounded-xl border border-zinc-800 bg-zinc-900/40 p-6">
         <h2 className="text-lg font-medium text-white">Ajustes generales</h2>
         <p className="mt-2 text-sm text-zinc-500">
-          Moneda por defecto para movimientos nuevos, importaciones y reportes
-          en una sola moneda.
+          La app usa <strong className="text-zinc-400">pesos uruguayos (UYU)</strong>{" "}
+          para movimientos nuevos, importaciones y totales del resumen.
         </p>
-        <label className="mt-4 flex max-w-sm flex-col gap-1 text-sm">
-          <span className="text-zinc-400">Moneda por defecto</span>
-          <select
-            value={resolveDefaultCurrency(settings)}
-            onChange={(e) =>
-              setSettings({ defaultCurrency: e.target.value as CurrencyCode })
-            }
-            className="rounded-lg border border-zinc-700 bg-zinc-950 px-3 py-2 text-white"
-          >
-            <option value="UYU">UYU — pesos uruguayos</option>
-            <option value="USD">USD — dólares estadounidenses</option>
-          </select>
-        </label>
         <label className="mt-4 flex max-w-sm flex-col gap-1 text-sm">
           <span className="text-zinc-400">
             Tipo de cambio referencia (pesos por 1 USD)
@@ -210,8 +197,8 @@ export function DataBackup() {
             className="rounded-lg border border-zinc-700 bg-zinc-950 px-3 py-2 text-white"
           />
           <span className="text-xs text-zinc-600">
-            Opcional. Mezcla UYU y USD en KPI e informes cuando elegís una sola
-            moneda.
+            Opcional. Para sumar movimientos en dólares dentro de los totales en
+            pesos.
           </span>
         </label>
       </section>
@@ -297,12 +284,10 @@ export function DataBackup() {
             <span className="text-zinc-400">Moneda</span>
             <select
               name="currency"
-              defaultValue={resolveDefaultCurrency(settings)}
+              defaultValue="UYU"
               className="rounded-lg border border-zinc-700 bg-zinc-950 px-3 py-2 text-white"
             >
               <option value="UYU">UYU</option>
-              <option value="USD">USD</option>
-              <option value="EUR">EUR</option>
             </select>
           </label>
           <div className="flex items-end">

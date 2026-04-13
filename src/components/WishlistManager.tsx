@@ -2,9 +2,9 @@
 
 import { useMemo, useState } from "react";
 import { projectedSurplusForPeriod } from "@/lib/finance";
-import { formatMoneyWithSettings, resolveDefaultCurrency } from "@/lib/format";
+import { formatMoneyWithSettings } from "@/lib/format";
 import { useFinanceStore } from "@/lib/store";
-import type { CurrencyCode, WishlistPriority } from "@/lib/types";
+import type { WishlistPriority } from "@/lib/types";
 import { evaluateWishlistItem } from "@/lib/wishlist-logic";
 import { cn } from "@/lib/cn";
 
@@ -12,12 +12,6 @@ const PRIORITIES: { id: WishlistPriority; label: string }[] = [
   { id: "high", label: "Alta" },
   { id: "medium", label: "Media" },
   { id: "low", label: "Baja" },
-];
-
-const WISH_CUR: { id: CurrencyCode; label: string }[] = [
-  { id: "UYU", label: "UYU" },
-  { id: "USD", label: "USD" },
-  { id: "EUR", label: "EUR" },
 ];
 
 export function WishlistManager({
@@ -38,38 +32,30 @@ export function WishlistManager({
   const [estimate, setEstimate] = useState("");
   const [priority, setPriority] = useState<WishlistPriority>("medium");
   const [notes, setNotes] = useState("");
-  const [wishCurrency, setWishCurrency] = useState<CurrencyCode>(() =>
-    resolveDefaultCurrency(settings),
-  );
-
-  const fmt = (n: number, c: CurrencyCode) =>
-    formatMoneyWithSettings(n, settings, c);
+  const fmt = (n: number) => formatMoneyWithSettings(n, settings, "UYU");
 
   const sorted = useMemo(() => {
     return [...wishlist].sort((a, b) => b.estimate - a.estimate);
   }, [wishlist]);
 
-  const monthlyExtraByCur = useMemo(() => {
-    const def = resolveDefaultCurrency(settings);
-    const out: Partial<Record<CurrencyCode, number>> = {};
+  const monthlyExtraUyu = useMemo(() => {
+    let s = 0;
     for (const r of recurringIncomes) {
       if (!r.active) continue;
-      const c = r.currency ?? def;
-      out[c] = (out[c] ?? 0) + r.amount;
+      const c = r.currency ?? "UYU";
+      if (c === "UYU") s += r.amount;
     }
-    return out;
-  }, [recurringIncomes, settings]);
+    return s;
+  }, [recurringIncomes]);
 
   return (
     <div className="space-y-6">
       <section className="rounded-xl border border-zinc-800 bg-zinc-900/40 p-6">
         <h2 className="text-lg font-medium text-white">Lista de deseos</h2>
         <p className="mt-2 text-sm text-zinc-500">
-          Cada ítem tiene moneda (UYU, USD o EUR). El veredicto usa el superávit
-          proyectado en esa moneda. Recurrentes activos:{" "}
-          {Object.entries(monthlyExtraByCur)
-            .map(([c, n]) => `${fmt(n, c as CurrencyCode)}/${c}`)
-            .join(" · ") || "—"}
+          Presupuestos en <strong className="text-zinc-400">pesos uruguayos</strong>.
+          El veredicto usa el superávit proyectado en pesos. Recurrentes activos
+          en UYU: {monthlyExtraUyu > 0 ? fmt(monthlyExtraUyu) : "—"}
         </p>
         <form
           className="mt-4 grid gap-4 sm:grid-cols-2"
@@ -82,7 +68,7 @@ export function WishlistManager({
               estimate: n,
               priority,
               notes: notes.trim(),
-              currency: wishCurrency,
+              currency: "UYU",
             });
             setName("");
             setEstimate("");
@@ -106,22 +92,6 @@ export function WishlistManager({
               className="rounded-lg border border-zinc-700 bg-zinc-950 px-3 py-2 text-white"
               required
             />
-          </label>
-          <label className="flex flex-col gap-1 text-sm">
-            <span className="text-zinc-400">Moneda del presupuesto</span>
-            <select
-              value={wishCurrency}
-              onChange={(e) =>
-                setWishCurrency(e.target.value as CurrencyCode)
-              }
-              className="rounded-lg border border-zinc-700 bg-zinc-950 px-3 py-2 text-white"
-            >
-              {WISH_CUR.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.label}
-                </option>
-              ))}
-            </select>
           </label>
           <label className="flex flex-col gap-1 text-sm">
             <span className="text-zinc-400">Prioridad</span>
@@ -163,12 +133,11 @@ export function WishlistManager({
           <p className="text-sm text-zinc-500">La lista está vacía.</p>
         )}
         {sorted.map((item) => {
-          const cur = item.currency ?? resolveDefaultCurrency(settings);
           const surplus = projectedSurplusForPeriod(
             transactions,
             recurringIncomes,
             settings,
-            cur,
+            "UYU",
             periodFrom,
             periodTo,
           );
@@ -181,10 +150,7 @@ export function WishlistManager({
               <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
                 <div>
                   <h3 className="font-medium text-white">{item.name}</h3>
-                  <p className="text-sm text-zinc-400">
-                    {fmt(item.estimate, cur)}{" "}
-                    <span className="text-zinc-600">({cur})</span>
-                  </p>
+                  <p className="text-sm text-zinc-400">{fmt(item.estimate)}</p>
                   {item.notes && (
                     <p className="mt-2 text-sm text-zinc-500">{item.notes}</p>
                   )}

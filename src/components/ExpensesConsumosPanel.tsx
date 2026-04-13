@@ -54,15 +54,44 @@ function paymentMethodLabel(pm: PaymentMethod): string {
   }
 }
 
-function amountForColumn(
+/** Equivalente en pesos para un movimiento (USD × TC; otras monedas al nominal). */
+function txPesoEquiv(
   t: Transaction,
   settings: AppSettings,
-  col: "UYU" | "USD" | "other",
+  fx: number,
+  hasFx: boolean,
 ): number {
   const c = txCurrency(t, settings);
-  if (col === "UYU") return c === "UYU" ? t.amount : 0;
-  if (col === "USD") return c === "USD" ? t.amount : 0;
-  return c !== "UYU" && c !== "USD" ? t.amount : 0;
+  if (c === "UYU") return t.amount;
+  if (c === "USD") return hasFx ? t.amount * fx : 0;
+  return t.amount;
+}
+
+function rowPesoEquiv(
+  row: CategoryExpenseDualRow,
+  fx: number,
+  hasFx: boolean,
+) {
+  if (hasFx) {
+    return {
+      total: row.uyu + row.usd * fx + row.other,
+      tarjetas:
+        row.uyuDebit +
+        row.uyuCredit +
+        (row.usdDebit + row.usdCredit) * fx +
+        row.otherDebit +
+        row.otherCredit,
+      eft:
+        row.uyuOtherPay +
+        row.usdOtherPay * fx +
+        row.otherOtherPay,
+    };
+  }
+  return {
+    total: row.uyu,
+    tarjetas: row.uyuDebit + row.uyuCredit,
+    eft: row.uyuOtherPay,
+  };
 }
 
 function TarjetasCell({
@@ -132,39 +161,52 @@ export function ExpensesConsumosPanel({
     return o;
   }, [rows]);
 
+  const footEquiv = useMemo(
+    () => rowPesoEquiv(
+      {
+        category: "",
+        uyu: totals.uyu,
+        usd: totals.usd,
+        other: totals.other,
+        uyuDebit: totals.uyuDebit,
+        uyuCredit: totals.uyuCredit,
+        uyuOtherPay: totals.uyuOtherPay,
+        usdDebit: totals.usdDebit,
+        usdCredit: totals.usdCredit,
+        usdOtherPay: totals.usdOtherPay,
+        otherDebit: totals.otherDebit,
+        otherCredit: totals.otherCredit,
+        otherOtherPay: totals.otherOtherPay,
+        transactions: [],
+      },
+      fx,
+      hasFx,
+    ),
+    [totals, fx, hasFx],
+  );
+
   const totalCombinedForPct = useMemo(() => {
-    if (!hasFx) return 0;
-    return rows.reduce((s, r) => s + r.uyu + r.usd * fx, 0);
+    if (!hasFx) {
+      return rows.reduce((s, r) => s + r.uyu, 0);
+    }
+    return rows.reduce((s, r) => s + r.uyu + r.usd * fx + r.other, 0);
   }, [rows, hasFx, fx]);
 
   const pieData = useMemo(() => {
     const data: { name: string; value: number }[] = [];
     for (const r of rows) {
-      const v = hasFx ? r.uyu + r.usd * fx : r.uyu;
+      const v = hasFx ? r.uyu + r.usd * fx + r.other : r.uyu;
       if (v <= 0) continue;
       data.push({ name: r.category, value: v });
     }
-    if (hasFx && totals.other > 0) {
-      data.push({
-        name: "Otras monedas (EUR…)",
-        value: totals.other,
-      });
-    }
     return data.sort((a, b) => b.value - a.value);
-  }, [rows, hasFx, fx, totals.other]);
+  }, [rows, hasFx, fx]);
 
   const [open, setOpen] = useState<Record<string, boolean>>({});
 
   const fmtUyu = (n: number) => formatMoneyWithSettings(n, settings, "UYU");
-  const fmtUsd = (n: number) => formatMoneyWithSettings(n, settings, "USD");
-  const fmtPlain = (n: number) =>
-    n.toLocaleString(settings.locale, {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    });
 
-  const showOtherCol = totals.other > 0;
-  const mainColSpan = showOtherCol ? 11 : 8;
+  const mainColSpan = 5;
 
   if (rows.length === 0) {
     return (
@@ -180,15 +222,14 @@ export function ExpensesConsumosPanel({
         <div className="border-b border-zinc-800 px-4 py-3">
           <h2 className="text-sm font-medium text-zinc-200">Consumos</h2>
           <p className="mt-1 text-xs text-zinc-500">
-            Total por categoría y moneda; columna{" "}
-            <strong className="text-zinc-400">Tarjetas</strong> = débito + crédito
-            (con desglose D/C debajo) y{" "}
-            <strong className="text-zinc-400">efectivo/transferencia</strong>. La
-            suma de las dos columnas de medio coincide con el total de la moneda.
+            Todo en <strong className="text-zinc-400">pesos uruguayos</strong>.
+            {hasFx
+              ? " Los gastos en USD se convierten con el tipo de cambio de Datos."
+              : " Solo se muestran montos nativos en pesos; cargá un tipo de cambio en Datos para sumar también los USD en esta tabla."}
           </p>
         </div>
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[820px] text-left text-sm">
+          <table className="w-full min-w-[520px] text-left text-sm">
             <thead className="border-b border-zinc-800 bg-zinc-950/60 text-xs uppercase text-zinc-500">
               <tr>
                 <th
@@ -201,22 +242,8 @@ export function ExpensesConsumosPanel({
                   colSpan={3}
                   className="border-l border-zinc-800 px-3 py-2 text-center font-medium text-zinc-300"
                 >
-                  Pesos (UYU)
+                  Pesos uruguayos (equivalente)
                 </th>
-                <th
-                  colSpan={3}
-                  className="border-l border-zinc-800 px-3 py-2 text-center font-medium text-zinc-300"
-                >
-                  Dólares (USD)
-                </th>
-                {showOtherCol && (
-                  <th
-                    colSpan={3}
-                    className="border-l border-zinc-800 px-3 py-2 text-center font-medium text-amber-200/80"
-                  >
-                    Otras monedas
-                  </th>
-                )}
                 <th
                   rowSpan={2}
                   className="border-l border-zinc-800 px-3 py-2 text-right align-bottom"
@@ -237,48 +264,19 @@ export function ExpensesConsumosPanel({
                 <th className="px-2 py-1.5 text-right font-medium" title="Efectivo y transferencia">
                   Eft./transf.
                 </th>
-                <th className="border-l border-zinc-800 px-2 py-1.5 text-right font-medium">
-                  Total
-                </th>
-                <th
-                  className="px-2 py-1.5 text-right font-medium"
-                  title="Tarjeta débito + tarjeta crédito (desglose debajo)"
-                >
-                  Tarjetas
-                </th>
-                <th className="px-2 py-1.5 text-right font-medium" title="Efectivo y transferencia">
-                  Eft./transf.
-                </th>
-                {showOtherCol && (
-                  <>
-                    <th className="border-l border-zinc-800 px-2 py-1.5 text-right font-medium">
-                      Total
-                    </th>
-                    <th
-                      className="px-2 py-1.5 text-right font-medium"
-                      title="Tarjeta débito + tarjeta crédito (desglose debajo)"
-                    >
-                      Tarjetas
-                    </th>
-                    <th className="px-2 py-1.5 text-right font-medium">
-                      Eft./transf.
-                    </th>
-                  </>
-                )}
               </tr>
             </thead>
             <tbody className="divide-y divide-zinc-800/80">
               {rows.map((row) => {
                 const Icon = categoryIcon(row.category);
                 const isOpen = open[row.category] ?? false;
-                const baseUyuEquiv = row.uyu + row.usd * fx;
+                const equiv = rowPesoEquiv(row, fx, hasFx);
+                const baseForPct = hasFx
+                  ? row.uyu + row.usd * fx + row.other
+                  : row.uyu;
                 const pct =
-                  hasFx && totalCombinedForPct > 0
-                    ? baseUyuEquiv > 0
-                      ? (baseUyuEquiv / totalCombinedForPct) * 100
-                      : row.other > 0
-                        ? null
-                        : 0
+                  totalCombinedForPct > 0 && baseForPct > 0
+                    ? (baseForPct / totalCombinedForPct) * 100
                     : null;
 
                 return (
@@ -294,12 +292,12 @@ export function ExpensesConsumosPanel({
                       }))
                     }
                     fmtUyu={fmtUyu}
-                    fmtUsd={fmtUsd}
-                    fmtPlain={fmtPlain}
                     settings={settings}
-                    showOtherCol={showOtherCol}
                     pct={pct}
                     mainColSpan={mainColSpan}
+                    equiv={equiv}
+                    hasFx={hasFx}
+                    fx={fx}
                   />
                 );
               })}
@@ -308,44 +306,34 @@ export function ExpensesConsumosPanel({
               <tr>
                 <td className="px-3 py-3 font-medium text-zinc-300">Total</td>
                 <td className="border-l border-zinc-800 px-2 py-3 text-right font-semibold tabular-nums text-zinc-100">
-                  {fmtUyu(totals.uyu)}
+                  {fmtUyu(footEquiv.total)}
                 </td>
                 <TarjetasCell
-                  debit={totals.uyuDebit}
-                  credit={totals.uyuCredit}
+                  debit={
+                    hasFx
+                      ? totals.uyuDebit + totals.usdDebit * fx + totals.otherDebit
+                      : totals.uyuDebit
+                  }
+                  credit={
+                    hasFx
+                      ? totals.uyuCredit +
+                        totals.usdCredit * fx +
+                        totals.otherCredit
+                      : totals.uyuCredit
+                  }
                   fmt={fmtUyu}
                 />
                 <td className="px-2 py-3 text-right tabular-nums text-zinc-400">
-                  {fmtUyu(totals.uyuOtherPay)}
+                  {fmtUyu(
+                    hasFx
+                      ? totals.uyuOtherPay +
+                          totals.usdOtherPay * fx +
+                          totals.otherOtherPay
+                      : totals.uyuOtherPay,
+                  )}
                 </td>
-                <td className="border-l border-zinc-800 px-2 py-3 text-right font-semibold tabular-nums text-zinc-100">
-                  {fmtUsd(totals.usd)}
-                </td>
-                <TarjetasCell
-                  debit={totals.usdDebit}
-                  credit={totals.usdCredit}
-                  fmt={fmtUsd}
-                />
-                <td className="px-2 py-3 text-right tabular-nums text-zinc-400">
-                  {fmtUsd(totals.usdOtherPay)}
-                </td>
-                {showOtherCol && (
-                  <>
-                    <td className="border-l border-zinc-800 px-2 py-3 text-right font-semibold tabular-nums text-amber-200/90">
-                      {fmtPlain(totals.other)}
-                    </td>
-                    <TarjetasCell
-                      debit={totals.otherDebit}
-                      credit={totals.otherCredit}
-                      fmt={fmtPlain}
-                    />
-                    <td className="px-2 py-3 text-right tabular-nums text-amber-200/50">
-                      {fmtPlain(totals.otherOtherPay)}
-                    </td>
-                  </>
-                )}
                 <td className="border-l border-zinc-800 px-3 py-3 text-right text-zinc-600">
-                  {hasFx && totalCombinedForPct > 0 ? "100%" : "—"}
+                  {totalCombinedForPct > 0 ? "100%" : "—"}
                 </td>
               </tr>
             </tfoot>
@@ -360,7 +348,7 @@ export function ExpensesConsumosPanel({
             No hay montos en pesos para armar el gráfico.{" "}
             {hasFx
               ? "Cargá movimientos o revisá el período."
-              : "Configurá el tipo de cambio referencia en Datos para incluir dólares en el gráfico, o registrá gastos en pesos."}
+              : "Configurá el tipo de cambio en Datos para incluir dólares en el gráfico, o registrá gastos en pesos."}
           </p>
         ) : (
           <>
@@ -401,8 +389,8 @@ export function ExpensesConsumosPanel({
             </div>
             <p className="mt-2 text-[11px] leading-relaxed text-zinc-600">
               {hasFx
-                ? "Cada segmento usa pesos + dólares convertidos con tu tipo de cambio referencia. “Otras monedas” no se convierten."
-                : "Solo gastos en pesos (UYU). Para mezclar con USD en el gráfico, definí el tipo de cambio en Datos."}
+                ? "Cada segmento es el total de la categoría en pesos (UYU + USD × TC + otras monedas al nominal)."
+                : "Solo gastos registrados en pesos. Definí el tipo de cambio en Datos para incluir USD en el gráfico."}
             </p>
           </>
         )}
@@ -417,25 +405,32 @@ function CategoryConsumoRow({
   isOpen,
   onToggle,
   fmtUyu,
-  fmtUsd,
-  fmtPlain,
   settings,
-  showOtherCol,
   pct,
   mainColSpan,
+  equiv,
+  hasFx,
+  fx,
 }: {
   row: CategoryExpenseDualRow;
   Icon: LucideIcon;
   isOpen: boolean;
   onToggle: () => void;
   fmtUyu: (n: number) => string;
-  fmtUsd: (n: number) => string;
-  fmtPlain: (n: number) => string;
   settings: AppSettings;
-  showOtherCol: boolean;
   pct: number | null;
   mainColSpan: number;
+  equiv: { total: number; tarjetas: number; eft: number };
+  hasFx: boolean;
+  fx: number;
 }) {
+  const debitEquiv = hasFx
+    ? row.uyuDebit + row.usdDebit * fx + row.otherDebit
+    : row.uyuDebit;
+  const creditEquiv = hasFx
+    ? row.uyuCredit + row.usdCredit * fx + row.otherCredit
+    : row.uyuCredit;
+
   return (
     <>
       <tr className="hover:bg-zinc-900/50">
@@ -455,42 +450,12 @@ function CategoryConsumoRow({
           </button>
         </td>
         <td className="border-l border-zinc-800/80 px-2 py-2.5 text-right tabular-nums text-zinc-100">
-          {fmtUyu(row.uyu)}
+          {fmtUyu(equiv.total)}
         </td>
-        <TarjetasCell
-          debit={row.uyuDebit}
-          credit={row.uyuCredit}
-          fmt={fmtUyu}
-        />
+        <TarjetasCell debit={debitEquiv} credit={creditEquiv} fmt={fmtUyu} />
         <td className="px-2 py-2.5 text-right tabular-nums text-zinc-500">
-          {fmtUyu(row.uyuOtherPay)}
+          {fmtUyu(equiv.eft)}
         </td>
-        <td className="border-l border-zinc-800/80 px-2 py-2.5 text-right tabular-nums text-zinc-100">
-          {fmtUsd(row.usd)}
-        </td>
-        <TarjetasCell
-          debit={row.usdDebit}
-          credit={row.usdCredit}
-          fmt={fmtUsd}
-        />
-        <td className="px-2 py-2.5 text-right tabular-nums text-zinc-500">
-          {fmtUsd(row.usdOtherPay)}
-        </td>
-        {showOtherCol && (
-          <>
-            <td className="border-l border-zinc-800/80 px-2 py-2.5 text-right tabular-nums text-amber-200/90">
-              {fmtPlain(row.other)}
-            </td>
-            <TarjetasCell
-              debit={row.otherDebit}
-              credit={row.otherCredit}
-              fmt={fmtPlain}
-            />
-            <td className="px-2 py-2.5 text-right tabular-nums text-amber-200/40">
-              {fmtPlain(row.otherOtherPay)}
-            </td>
-          </>
-        )}
         <td className="border-l border-zinc-800/80 px-3 py-2.5 text-right tabular-nums text-zinc-500">
           {pct != null ? `${pct.toFixed(1)}%` : "—"}
         </td>
@@ -505,15 +470,9 @@ function CategoryConsumoRow({
                     <th className="px-3 py-2 text-left font-medium">Fecha</th>
                     <th className="px-3 py-2 text-left font-medium">Detalle</th>
                     <th className="px-3 py-2 text-left font-medium">Medio</th>
-                    <th className="px-3 py-2 text-right font-medium">Pesos</th>
                     <th className="px-3 py-2 text-right font-medium">
-                      Dólares
+                      Importe (pesos)
                     </th>
-                    {showOtherCol && (
-                      <th className="px-3 py-2 text-right font-medium text-zinc-600">
-                        Otras
-                      </th>
-                    )}
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-zinc-800/60">
@@ -529,22 +488,8 @@ function CategoryConsumoRow({
                         {paymentMethodLabel(t.paymentMethod)}
                       </td>
                       <td className="px-3 py-2 text-right tabular-nums text-zinc-300">
-                        {fmtUyu(amountForColumn(t, settings, "UYU"))}
+                        {fmtUyu(txPesoEquiv(t, settings, fx, hasFx))}
                       </td>
-                      <td className="px-3 py-2 text-right tabular-nums text-zinc-300">
-                        {fmtUsd(amountForColumn(t, settings, "USD"))}
-                      </td>
-                      {showOtherCol && (
-                        <td className="px-3 py-2 text-right tabular-nums text-amber-200/70">
-                          {amountForColumn(t, settings, "other") > 0
-                            ? formatMoneyWithSettings(
-                                amountForColumn(t, settings, "other"),
-                                settings,
-                                txCurrency(t, settings),
-                              )
-                            : fmtPlain(0)}
-                        </td>
-                      )}
                     </tr>
                   ))}
                 </tbody>
@@ -557,16 +502,8 @@ function CategoryConsumoRow({
                       Total {row.category}
                     </td>
                     <td className="px-3 py-2 text-right font-semibold tabular-nums">
-                      {fmtUyu(row.uyu)}
+                      {fmtUyu(equiv.total)}
                     </td>
-                    <td className="px-3 py-2 text-right font-semibold tabular-nums">
-                      {fmtUsd(row.usd)}
-                    </td>
-                    {showOtherCol && (
-                      <td className="px-3 py-2 text-right font-semibold tabular-nums text-amber-200/80">
-                        {fmtPlain(row.other)}
-                      </td>
-                    )}
                   </tr>
                 </tfoot>
               </table>
