@@ -1,3 +1,4 @@
+import { shouldReclassifyIncomeAsCardExpense } from "./finance";
 import type { CurrencyCode, PaymentMethod, TransactionType } from "./types";
 
 export type SingleAmountConvention =
@@ -320,6 +321,13 @@ export function parseBankCsv(
     } else {
       skipped++;
       continue;
+    }
+
+    if (
+      type === "income" &&
+      shouldReclassifyIncomeAsCardExpense({ type, description })
+    ) {
+      type = "expense";
     }
 
     let rowCurrency: CurrencyCode = defaultCurrency;

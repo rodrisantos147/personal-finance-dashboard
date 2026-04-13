@@ -23,6 +23,9 @@ export function DataBackup() {
   const reapplyIncomeOmitHeuristic = useFinanceStore(
     (s) => s.reapplyIncomeOmitHeuristic,
   );
+  const reclassifyCardPurchasesMislabeledAsIncome = useFinanceStore(
+    (s) => s.reclassifyCardPurchasesMislabeledAsIncome,
+  );
   const transactionCount = useFinanceStore((s) => s.transactions.length);
   const loadDemoData = useFinanceStore((s) => s.loadDemoData);
   const resetAll = useFinanceStore((s) => s.resetAll);
@@ -156,6 +159,20 @@ export function DataBackup() {
           }}
         >
           Detectar pagos de tarjeta en ingresos
+        </button>
+        <button
+          type="button"
+          className="ml-3 mt-4 rounded-lg border border-amber-800/60 px-4 py-2.5 text-sm text-amber-100/90 hover:bg-amber-950/40"
+          onClick={() => {
+            const { updated } = reclassifyCardPurchasesMislabeledAsIncome();
+            alert(
+              updated
+                ? `Se pasaron ${updated} movimientos de ingreso a gasto con tarjeta (compras mal clasificadas). Revisá Resumen y Movimientos.`
+                : "No había ingresos que coincidan con el patrón (ej. DLO*, PedidosYa). Si falta alguno, corregilo a mano.",
+            );
+          }}
+        >
+          Corregir compras TC cargadas como ingreso
         </button>
       </section>
 

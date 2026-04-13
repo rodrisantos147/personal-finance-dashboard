@@ -7,7 +7,10 @@ import {
   normalizeStoredCurrency,
   resolveDefaultCurrency,
 } from "./format";
-import { inferOmitFromPeriodSummary } from "./finance";
+import {
+  inferOmitFromPeriodSummary,
+  shouldReclassifyIncomeAsCardExpense,
+} from "./finance";
 import {
   dedupeTransactionsByKey,
   transactionDedupeKey,
@@ -74,6 +77,10 @@ interface FinanceState {
    * (misma heurística que el import CSV/PDF).
    */
   reapplyIncomeOmitHeuristic: () => { updated: number };
+  /**
+   * Pasa a gasto con medio tarjeta los ingresos que parecen compras TC (DLO*, PedidosYa, etc.).
+   */
+  reclassifyCardPurchasesMislabeledAsIncome: () => { updated: number };
   updateTransaction: (id: string, t: Partial<Transaction>) => void;
   removeTransaction: (id: string) => void;
 
@@ -195,6 +202,25 @@ export const useFinanceStore = create<FinanceState>()(
             }
             return t;
           }),
+        }));
+        return { updated };
+      },
+
+      reclassifyCardPurchasesMislabeledAsIncome: () => {
+        let updated = 0;
+        set((s) => ({
+          transactions: s.transactions
+            .map((t) => {
+              if (!shouldReclassifyIncomeAsCardExpense(t)) return t;
+              updated++;
+              return {
+                ...t,
+                type: "expense" as const,
+                paymentMethod: "credit" as const,
+                category: t.category === "Ingreso" ? "Otros" : t.category,
+              };
+            })
+            .sort((a, b) => b.date.localeCompare(a.date)),
         }));
         return { updated };
       },

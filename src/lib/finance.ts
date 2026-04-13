@@ -42,9 +42,45 @@ export function countsAsPeriodExpense(t: Transaction): boolean {
 }
 
 /**
- * Heurística para import: ingresos que en extractos de TC son pagos desde cuenta,
- * no sueldo ni cobros reales.
+ * Compras con tarjeta que quedaron como `income` (típico: extracto con monto
+ * positivo o columna “crédito” mal leída). No toca reintegros ni pagos de tarjeta.
  */
+export function shouldReclassifyIncomeAsCardExpense(t: {
+  type: TransactionType;
+  description: string;
+}): boolean {
+  if (t.type !== "income") return false;
+  const u = t.description.trim().toUpperCase();
+  if (
+    /REINTEGRO|DEVOLUC|DEVOLUCI|CASHBACK|AJUSTE\s+A\s+FAVOR|ABONO\s+CRED|CREDITO\s+VARIOS/i.test(
+      u,
+    )
+  ) {
+    return false;
+  }
+  if (
+    /RECIBO\s+DE\s+PAGO|PAGO\s+.*TARJ|LIQUIDACI[ÓO]N\s+TARJ|TARJETA\s*\*{2,}/i.test(
+      t.description,
+    )
+  ) {
+    return false;
+  }
+  const d = t.description.trim();
+  if (
+    /\bTRASPASO\s+DE\b/i.test(d) ||
+    /^CRE\.?\s+CAMBIOS\b/i.test(d) ||
+    /\b(?:DEPOSITO|DEPÓSITO|ACREDITACI|TRANSF(?:ERENCIA)?\s+RECIB)/i.test(u)
+  ) {
+    return false;
+  }
+  return (
+    /DLO\*|DLO\s*\*|PEDIDOSYA|PEDIDOS\s*YA|RAPPI|UBER\s*\*?|STM\b|SINERGIA|TU\s+RACION|RACION\b|SPOTIFY|CLAUDE|UTE\b|SODIMAC|TIENDAMIA|BAMBOO|MERPAGO|MP\s*\*|NETFLIX|HBO|PRIME|APPLE\.COM|GOOGLE\s*\*|OPENAI|SUBSCRIPTION/i.test(
+      u,
+    ) || /\bCUOTA\s+\d+\s*\/\s*\d+/i.test(u)
+  );
+}
+
+/** Ingresos que en extractos de TC son pagos desde cuenta, no sueldo ni cobros reales. */
 export function inferOmitFromPeriodSummary(
   type: TransactionType,
   description: string,

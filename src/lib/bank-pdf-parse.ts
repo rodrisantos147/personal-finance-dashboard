@@ -4,6 +4,7 @@ import {
   parseDateFlexible,
   parseMoneyAR,
 } from "./csv-import";
+import { shouldReclassifyIncomeAsCardExpense } from "./finance";
 import type { CurrencyCode } from "./types";
 import type { TransactionType } from "./types";
 
@@ -59,6 +60,9 @@ function classifyItauUy(desc: string): TransactionType {
   }
   if (/TRASPASO\s+A|DEB\.|COMPRA|DEB\s|DEBITO/i.test(u)) {
     return "expense";
+  }
+  if (/TRASPASO\b/i.test(u) && !/\bTRASPASO\s+A\b/i.test(u)) {
+    return "income";
   }
   return "expense";
 }
@@ -144,12 +148,22 @@ export function parseItauUruguayPdfText(text: string): {
     }
 
     const d = new Date(year, mo, day);
-    const type = classifyItauUy(description);
+    let type = classifyItauUy(description);
+    const descShort = description.slice(0, 280);
+    if (
+      type === "income" &&
+      shouldReclassifyIncomeAsCardExpense({
+        type,
+        description: descShort,
+      })
+    ) {
+      type = "expense";
+    }
 
     rows.push({
       line: i,
       date: d.toISOString(),
-      description: description.slice(0, 280),
+      description: descShort,
       type,
       amount,
       currency: "UYU",
@@ -191,12 +205,19 @@ function parseSingleLine(line: string, lineNo: number): CsvImportPreviewRow | nu
   const signed = parseMoneyAR(amountRaw);
   if (!d || !Number.isFinite(signed) || signed === 0) return null;
 
-  const type = signed < 0 ? "expense" : "income";
+  let type: TransactionType = signed < 0 ? "expense" : "income";
+  const desc = descPart.slice(0, 280) || "Movimiento";
+  if (
+    type === "income" &&
+    shouldReclassifyIncomeAsCardExpense({ type, description: desc })
+  ) {
+    type = "expense";
+  }
   const cur: CurrencyCode = inferCurrencyFromMoneyStrings(t, amountRaw) ?? "UYU";
   return {
     line: lineNo,
     date: d.toISOString(),
-    description: descPart.slice(0, 280) || "Movimiento",
+    description: desc,
     type,
     amount: Math.abs(signed),
     currency: cur,
@@ -248,11 +269,21 @@ function parseDebitCreditLine(line: string, lineNo: number): CsvImportPreviewRow
       raw: t,
     };
   }
+  const descCred = desc.slice(0, 280) || "Ingreso";
+  let typeCred: TransactionType = "income";
+  if (
+    shouldReclassifyIncomeAsCardExpense({
+      type: "income",
+      description: descCred,
+    })
+  ) {
+    typeCred = "expense";
+  }
   return {
     line: lineNo,
     date: d.toISOString(),
-    description: desc.slice(0, 280) || "Ingreso",
-    type: "income",
+    description: descCred,
+    type: typeCred,
     amount: absCred,
     currency: cur,
     raw: t,
