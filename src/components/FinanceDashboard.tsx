@@ -156,6 +156,7 @@ export function FinanceDashboard() {
   );
   const creditShare =
     expense > 0 ? dv.credit / expense : 0;
+  const cardSpendDebitPlusCredit = dv.debit + dv.credit;
 
   const comparison = useMemo(
     () =>
@@ -371,6 +372,12 @@ export function FinanceDashboard() {
             <span className="text-xs text-zinc-500">
               {format(from, "d MMM yyyy")} — {format(to, "d MMM yyyy")}
             </span>
+            <p className="w-full text-xs leading-relaxed text-zinc-500">
+              Con <strong className="text-zinc-400">Mes</strong>, el período de los
+              KPI y tablas es el <strong className="text-zinc-400">mes calendario
+              completo</strong> seleccionado (del 1 al último día de ese mes), no un
+              mes “desde hoy”.
+            </p>
           </div>
         ) : (
           <div className="flex flex-wrap items-center gap-3">
@@ -392,6 +399,12 @@ export function FinanceDashboard() {
                 className="rounded-lg border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm text-white"
               />
             </label>
+            <p className="w-full text-xs leading-relaxed text-zinc-500">
+              Con <strong className="text-zinc-400">Rango</strong>, se incluyen
+              movimientos entre la fecha &quot;Desde&quot; y el{" "}
+              <strong className="text-zinc-400">fin del mes</strong> de
+              &quot;Hasta&quot;.
+            </p>
           </div>
         )}
       </section>
@@ -465,16 +478,25 @@ export function FinanceDashboard() {
               value={fmt(expense)}
               hint={`vs período anterior: ${fmtDeltaPct(comparison.deltaExpensePct)}`}
               detail={
-                <span className="text-zinc-400">
-                  Débito {fmt(dv.debit)} · Crédito {fmt(dv.credit)} · Efect./transf.{" "}
-                  {fmt(dv.other)}
-                </span>
+                <>
+                  <span className="font-medium text-zinc-300">
+                    Tarjetas (débito + crédito): {fmt(cardSpendDebitPlusCredit)}
+                  </span>
+                  <span className="mt-1 block text-zinc-400">
+                    Desglose: débito {fmt(dv.debit)} · crédito {fmt(dv.credit)} ·
+                    efect./transf. {fmt(dv.other)}
+                  </span>
+                  <span className="mt-1.5 block text-[11px] leading-snug text-zinc-600">
+                    El total de tarjetas suma ambos medios. El desglose depende de cómo
+                    cargaste cada movimiento en Movimientos.
+                  </span>
+                </>
               }
             />
             <Kpi
               label="Resultado (ingresos − gastos)"
               value={fmt(net)}
-              hint="Solo movimientos con fecha en el período"
+              hint="Solo movimientos con fecha dentro del período de arriba (mes completo o rango)"
               positive={net >= 0}
             />
             <Kpi
@@ -502,11 +524,14 @@ export function FinanceDashboard() {
               </p>
               {referenceExpenseByPay && (
                 <p className="mt-1 text-xs text-zinc-600">
-                  Gastos por medio (equiv. UYU): débito{" "}
-                  {fmtUyu(referenceExpenseByPay.debit)} · crédito{" "}
-                  {fmtUyu(referenceExpenseByPay.credit)} · efect./transf.{" "}
-                  {fmtUyu(referenceExpenseByPay.otherPay)} (suma ={" "}
-                  {fmtUyu(referenceExpenseByPay.total)})
+                  Tarjetas juntas (equiv. UYU):{" "}
+                  {fmtUyu(
+                    referenceExpenseByPay.debit + referenceExpenseByPay.credit,
+                  )}{" "}
+                  (déb. {fmtUyu(referenceExpenseByPay.debit)} · créd.{" "}
+                  {fmtUyu(referenceExpenseByPay.credit)}) · efect./transf.{" "}
+                  {fmtUyu(referenceExpenseByPay.otherPay)} · total gastos{" "}
+                  {fmtUyu(referenceExpenseByPay.total)}
                 </p>
               )}
             </div>
@@ -609,16 +634,28 @@ export function FinanceDashboard() {
               Gastos del período por medio de pago
             </h2>
             <p className="mb-4 text-xs text-zinc-600">
-              Misma moneda del resumen que arriba. La suma de las tres cajas es el
-              total de gastos del período ({fmt(expense)}).
+              Misma moneda del resumen. Tarjetas = débito + crédito juntos; abajo el
+              desglose. La suma de las tres filas inferiores coincide con el total de
+              gastos ({fmt(expense)}).
             </p>
+            <div className="mb-4 rounded-lg border border-zinc-700 bg-zinc-950/50 px-4 py-3">
+              <p className="text-xs font-medium uppercase tracking-wide text-zinc-500">
+                Con tarjeta (débito + crédito)
+              </p>
+              <p className="mt-1 text-2xl font-semibold text-white">
+                {fmt(cardSpendDebitPlusCredit)}
+              </p>
+              <p className="mt-1 text-xs text-zinc-500">
+                Desglose: débito {fmt(dv.debit)} · crédito {fmt(dv.credit)}
+              </p>
+            </div>
             <div className="grid gap-4 sm:grid-cols-3">
               <div>
-                <p className="text-xs text-zinc-500">Tarjeta débito</p>
+                <p className="text-xs text-zinc-500">Solo tarjeta débito</p>
                 <p className="text-xl font-semibold">{fmt(dv.debit)}</p>
               </div>
               <div>
-                <p className="text-xs text-zinc-500">Tarjeta crédito</p>
+                <p className="text-xs text-zinc-500">Solo tarjeta crédito</p>
                 <p className="text-xl font-semibold">{fmt(dv.credit)}</p>
               </div>
               <div>
