@@ -7,6 +7,7 @@ import {
   normalizeStoredCurrency,
   resolveDefaultCurrency,
 } from "./format";
+import { inferOmitFromPeriodSummary } from "./finance";
 import {
   dedupeTransactionsByKey,
   transactionDedupeKey,
@@ -68,6 +69,11 @@ interface FinanceState {
   ) => { added: number; skippedDuplicates: number };
   /** Elimina movimientos duplicados ya guardados (una pasada por clave). */
   dedupeTransactions: () => { removed: number };
+  /**
+   * Marca como &quot;fuera del resumen&quot; ingresos que parecen pago de tarjeta
+   * (misma heurística que el import CSV/PDF).
+   */
+  reapplyIncomeOmitHeuristic: () => { updated: number };
   updateTransaction: (id: string, t: Partial<Transaction>) => void;
   removeTransaction: (id: string) => void;
 
@@ -174,6 +180,23 @@ export const useFinanceStore = create<FinanceState>()(
         const next = dedupeTransactionsByKey(s.transactions, s.settings);
         set({ transactions: next });
         return { removed: before - next.length };
+      },
+
+      reapplyIncomeOmitHeuristic: () => {
+        let updated = 0;
+        set((s) => ({
+          transactions: s.transactions.map((t) => {
+            if (
+              inferOmitFromPeriodSummary(t.type, t.description) &&
+              !t.omitFromPeriodSummary
+            ) {
+              updated++;
+              return { ...t, omitFromPeriodSummary: true };
+            }
+            return t;
+          }),
+        }));
+        return { updated };
       },
 
       updateTransaction: (id, partial) =>

@@ -38,8 +38,13 @@ import {
   monthlyBuckets,
   pendingTotals,
   sumIncomeExpenseForReport,
+  transactionIncomeContributionInReport,
 } from "@/lib/finance";
-import { formatMoneyWithSettings, resolveDefaultCurrency } from "@/lib/format";
+import {
+  formatMoneyWithSettings,
+  resolveDefaultCurrency,
+  txCurrency,
+} from "@/lib/format";
 import type { CurrencyCode } from "@/lib/types";
 import { buildTips } from "@/lib/tips";
 import { useFinanceStore } from "@/lib/store";
@@ -116,6 +121,29 @@ export function FinanceDashboard() {
     [slice, settings, reportCurrency],
   );
   const net = income - expense;
+
+  const incomeAuditLines = useMemo(() => {
+    return slice
+      .map((t) => {
+        const contribution = transactionIncomeContributionInReport(
+          t,
+          settings,
+          reportCurrency,
+        );
+        return {
+          id: t.id,
+          desc: (t.description || "Sin detalle").slice(0, 56),
+          contribution,
+          native: formatMoneyWithSettings(
+            t.amount,
+            settings,
+            txCurrency(t, settings),
+          ),
+        };
+      })
+      .filter((x) => x.contribution > 0)
+      .sort((a, b) => b.contribution - a.contribution);
+  }, [slice, settings, reportCurrency]);
 
   const referenceTotals = useMemo(() => {
     const fx = settings.referenceUyuPerUsd;
@@ -488,10 +516,62 @@ export function FinanceDashboard() {
                   : `vs período anterior (${comparison.prevFrom.toLocaleDateString("es-UY")} — ${comparison.prevTo.toLocaleDateString("es-UY")}): ${fmtDeltaPct(comparison.deltaIncomePct)}`
               }
               detail={
-                <span className="text-[11px] leading-snug text-zinc-600">
-                  No incluye pagos a tarjeta ni traspasos marcados &quot;fuera del
-                  resumen&quot; en Movimientos.
-                </span>
+                <div className="space-y-2 text-[11px] leading-snug text-zinc-600">
+                  <p>
+                    Acá suma el <strong className="text-zinc-400">dinero que te
+                    entró</strong> en el período (sueldo, cobros, reintegros…).{" "}
+                    <strong className="text-zinc-400">No es lo que gastaste</strong>
+                    : eso está en la tarjeta &quot;Gastos del período&quot;.
+                  </p>
+                  {settings.referenceUyuPerUsd != null &&
+                    settings.referenceUyuPerUsd > 0 &&
+                    reportCurrency === "UYU" &&
+                    usedCurrencies.includes("USD") && (
+                      <p>
+                        Tenés ingresos o movimientos en USD: en este total en pesos
+                        se convierten con tu tipo de referencia en Datos (USD ×{" "}
+                        {settings.referenceUyuPerUsd}), eso puede subir mucho el
+                        número en UYU.
+                      </p>
+                    )}
+                  <p>
+                    No incluye filas marcadas &quot;fuera del resumen&quot; (pagos a
+                    tarjeta / traspasos) en Movimientos.
+                  </p>
+                  {incomeAuditLines.length > 0 && (
+                    <div className="border-t border-zinc-800/90 pt-2">
+                      <p className="mb-1.5 font-medium text-zinc-500">
+                        Desglose que suma este total ({incomeAuditLines.length}{" "}
+                        {incomeAuditLines.length === 1 ? "ingreso" : "ingresos"})
+                      </p>
+                      <ul className="max-h-36 space-y-1 overflow-y-auto text-left">
+                        {incomeAuditLines.slice(0, 10).map((row) => (
+                          <li
+                            key={row.id}
+                            className="flex items-baseline justify-between gap-2 border-b border-zinc-800/50 py-1 last:border-0"
+                          >
+                            <span className="min-w-0 flex-1 truncate text-zinc-500">
+                              {row.desc}
+                            </span>
+                            <span className="shrink-0 tabular-nums text-zinc-400">
+                              {fmt(row.contribution)}
+                              <span className="ml-1 text-[10px] text-zinc-600">
+                                ({row.native})
+                              </span>
+                            </span>
+                          </li>
+                        ))}
+                      </ul>
+                      {incomeAuditLines.length > 10 && (
+                        <p className="mt-1.5 text-[10px] text-zinc-600">
+                          +{incomeAuditLines.length - 10} más — revisá la pestaña
+                          Movimientos filtrando por el mismo período y tipo
+                          Ingreso.
+                        </p>
+                      )}
+                    </div>
+                  )}
+                </div>
               }
               positive
             />
@@ -772,7 +852,9 @@ function Kpi({
         {value}
       </p>
       {detail && (
-        <p className="mt-2 text-[11px] leading-relaxed text-zinc-500">{detail}</p>
+        <div className="mt-2 text-[11px] leading-relaxed text-zinc-500">
+          {detail}
+        </div>
       )}
       {hint && <p className="mt-2 text-xs text-zinc-500">{hint}</p>}
     </div>

@@ -20,6 +20,9 @@ export function DataBackup() {
   const importData = useFinanceStore((s) => s.importData);
   const importTransactions = useFinanceStore((s) => s.importTransactions);
   const dedupeTransactions = useFinanceStore((s) => s.dedupeTransactions);
+  const reapplyIncomeOmitHeuristic = useFinanceStore(
+    (s) => s.reapplyIncomeOmitHeuristic,
+  );
   const transactionCount = useFinanceStore((s) => s.transactions.length);
   const loadDemoData = useFinanceStore((s) => s.loadDemoData);
   const resetAll = useFinanceStore((s) => s.resetAll);
@@ -139,6 +142,20 @@ export function DataBackup() {
           }}
         >
           Quitar duplicados ahora
+        </button>
+        <button
+          type="button"
+          className="ml-3 mt-4 rounded-lg border border-zinc-600 px-4 py-2.5 text-sm text-zinc-200 hover:bg-zinc-800"
+          onClick={() => {
+            const { updated } = reapplyIncomeOmitHeuristic();
+            alert(
+              updated
+                ? `Se marcaron ${updated} ingresos como "fuera del resumen" (suelen ser pagos de tarjeta). Revisá Resumen.`
+                : "No se encontraron ingresos nuevos que califiquen. Si un pago de TC sigue sumando, marcálo a mano en Movimientos.",
+            );
+          }}
+        >
+          Detectar pagos de tarjeta en ingresos
         </button>
       </section>
 

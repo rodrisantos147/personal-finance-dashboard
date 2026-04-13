@@ -50,8 +50,11 @@ export function inferOmitFromPeriodSummary(
   description: string,
 ): boolean {
   if (type !== "income") return false;
-  return /RECIBO\s+DE\s+PAGO|RECIBO\s+PAGO.*TARJETA|PAGO\s+(DE\s+)?TARJETA|PAGO\s+TC\b|TARJETA\s*\*{2,}/i.test(
-    description.trim(),
+  const d = description.trim();
+  return (
+    /RECIBO\s+DE\s+PAGO|RECIBO\s+PAGO\s+TARJ|PAGO\s+(DE\s+)?TARJETA|PAGO\s+TC\b|PAGO\s+TOTAL\s+TARJ|LIQUIDACI[ÓO]N\s+TARJ|LIQ\.?\s*TARJ|TARJETA\s*\*{2,}|CREDITO\s+PAGO\s+TARJ|ABONO\s+PAGO\s+TARJ/i.test(
+      d,
+    ) || /PAGO\s+.*\d{4}\s*\*{2,}\d{2,4}/i.test(d)
   );
 }
 
@@ -159,6 +162,49 @@ export function sumIncomeExpenseForReport(
     income: sumIncome(transactions, settings, reportCurrency),
     expense: sumExpense(transactions, settings, reportCurrency),
   };
+}
+
+/**
+ * Cuánto aporta un movimiento al total de **ingresos** del informe (misma regla que
+ * `sumIncomeExpenseForReport`). Sirve para auditar el KPI sin adivinar.
+ */
+export function transactionIncomeContributionInReport(
+  t: Transaction,
+  settings: AppSettings,
+  reportCurrency: CurrencyCode,
+): number {
+  if (!countsAsPeriodIncome(t)) return 0;
+  const cur = txCurrency(t, settings);
+  const fx = settings.referenceUyuPerUsd;
+  const hasFx =
+    fx != null &&
+    Number.isFinite(fx) &&
+    fx > 0 &&
+    (reportCurrency === "UYU" || reportCurrency === "USD");
+
+  if (hasFx) {
+    if (reportCurrency === "UYU") {
+      if (cur === "UYU") return t.amount;
+      if (cur === "USD") return t.amount * fx;
+      return t.amount;
+    }
+    if (cur === "UYU") return t.amount / fx;
+    if (cur === "USD") return t.amount;
+    return t.amount;
+  }
+
+  if (reportCurrency === "UYU") {
+    if (cur === "UYU") return t.amount;
+    if (cur === "USD") return 0;
+    return t.amount;
+  }
+  if (reportCurrency === "USD") {
+    if (cur === "USD") return t.amount;
+    if (cur === "UYU") return 0;
+    return t.amount;
+  }
+  if (cur === "EUR") return t.amount;
+  return 0;
 }
 
 /**
