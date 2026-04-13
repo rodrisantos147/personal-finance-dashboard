@@ -155,8 +155,17 @@ export function FinanceDashboard() {
 
   const comparison = useMemo(
     () =>
-      compareToPreviousPeriod(transactions, from, to, settings, reportCurrency),
-    [transactions, from, to, settings, reportCurrency],
+      compareToPreviousPeriod(
+        transactions,
+        from,
+        to,
+        settings,
+        reportCurrency,
+        {
+          alignPreviousToCalendarMonth: rangeMode === "month",
+        },
+      ),
+    [transactions, from, to, settings, reportCurrency, rangeMode],
   );
 
   const chartAnchor = useMemo(() => {
@@ -472,13 +481,21 @@ export function FinanceDashboard() {
             <Kpi
               label="Ingresos del período"
               value={fmt(income)}
-              hint={`vs período anterior: ${fmtDeltaPct(comparison.deltaIncomePct)}`}
+              hint={
+                rangeMode === "month"
+                  ? `vs mes calendario anterior: ${fmtDeltaPct(comparison.deltaIncomePct)}`
+                  : `vs período anterior (${comparison.prevFrom.toLocaleDateString("es-UY")} — ${comparison.prevTo.toLocaleDateString("es-UY")}): ${fmtDeltaPct(comparison.deltaIncomePct)}`
+              }
               positive
             />
             <Kpi
               label="Gastos del período"
               value={fmt(expense)}
-              hint={`vs período anterior: ${fmtDeltaPct(comparison.deltaExpensePct)}`}
+              hint={
+                rangeMode === "month"
+                  ? `vs mes calendario anterior: ${fmtDeltaPct(comparison.deltaExpensePct)}`
+                  : `vs período anterior (${comparison.prevFrom.toLocaleDateString("es-UY")} — ${comparison.prevTo.toLocaleDateString("es-UY")}): ${fmtDeltaPct(comparison.deltaExpensePct)}`
+              }
               detail={
                 <>
                   <span className="font-medium text-zinc-300">

@@ -561,16 +561,47 @@ export function monthlyBuckets(
   return buckets;
 }
 
+export type CompareToPreviousPeriodOptions = {
+  /**
+   * Si el rango actual es un mes calendario completo (del 1 al último día),
+   * compara contra el **mes anterior calendario** entero. Así “vs período anterior”
+   * coincide con el mes previo (p. ej. febrero vs enero), no con una ventana de N
+   * días mal alineada.
+   */
+  alignPreviousToCalendarMonth?: boolean;
+};
+
+function isFullCalendarMonthRange(from: Date, to: Date): boolean {
+  return (
+    from.getTime() === startOfMonth(from).getTime() &&
+    to.getTime() === endOfMonth(from).getTime()
+  );
+}
+
 export function compareToPreviousPeriod(
   transactions: Transaction[],
   from: Date,
   to: Date,
   settings: AppSettings,
   currency: CurrencyCode,
+  options?: CompareToPreviousPeriodOptions,
 ) {
-  const len = to.getTime() - from.getTime();
-  const prevTo = addDays(from, -1);
-  const prevFrom = addDays(prevTo, -Math.round(len / (1000 * 60 * 60 * 24)));
+  let prevFrom: Date;
+  let prevTo: Date;
+
+  if (
+    options?.alignPreviousToCalendarMonth &&
+    isFullCalendarMonthRange(from, to)
+  ) {
+    const ref = subMonths(from, 1);
+    prevFrom = startOfMonth(ref);
+    prevTo = endOfMonth(ref);
+  } else {
+    const len = to.getTime() - from.getTime();
+    prevTo = addDays(from, -1);
+    prevFrom = addDays(prevTo, -Math.round(len / (1000 * 60 * 60 * 24)));
+  }
+
   const cur = filterByDateRange(transactions, from, to);
   const prev = filterByDateRange(transactions, prevFrom, prevTo);
   const curTotals = sumIncomeExpenseForReport(cur, settings, currency);
