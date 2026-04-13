@@ -106,10 +106,10 @@ export function PdfImport() {
       </h2>
       <p className="mt-2 text-sm text-zinc-500">
         Se lee el texto del PDF en tu navegador (no sube el archivo a ningún
-        servidor). Los extractos varían: si no aparecen movimientos, abrí el
-        bloque de texto crudo abajo y, si hace falta, exportá{" "}
-        <strong className="text-zinc-300">CSV</strong> desde el banco o pegá la
-        tabla en la importación CSV.
+        servidor). La moneda se infiere por texto (US$, dólares, SaaS) y por el
+        formato del monto (1.234,56 → pesos; 9,99 → USD). Los extractos varían:
+        si no aparecen movimientos, exportá{" "}
+        <strong className="text-zinc-300">CSV</strong> o pegá la tabla en CSV.
       </p>
 
       <label className="mt-4 block text-sm text-zinc-400">

@@ -1,11 +1,19 @@
 import {
   inferCurrencyFromDescriptionAndHints,
   inferCurrencyFromMoneyStrings,
+  resolveImportRowCurrency,
 } from "./currency-hints";
-import { shouldReclassifyIncomeAsCardExpense } from "./finance";
+import {
+  shouldReclassifyIncomeAsCardExpense,
+  shouldTreatPositiveAmountAsExpense,
+} from "./finance";
 import type { CurrencyCode, PaymentMethod, TransactionType } from "./types";
 
-export { inferCurrencyFromDescriptionAndHints, inferCurrencyFromMoneyStrings };
+export {
+  inferCurrencyFromDescriptionAndHints,
+  inferCurrencyFromMoneyStrings,
+  resolveImportRowCurrency,
+};
 
 export type SingleAmountConvention =
   | "signed"
@@ -260,6 +268,8 @@ export function parseBankCsv(
       continue;
     }
 
+    const rowText = cells.map((c) => String(c).trim()).join(" ");
+
     const ds = cells[iFecha] ?? "";
     const d = parseDateFlexible(ds);
     if (!d) {
@@ -306,6 +316,12 @@ export function parseBankCsv(
       } else if (singleAmountConvention === "signed") {
         type = signed < 0 ? "expense" : "income";
         amount = Math.abs(signed);
+        if (
+          signed > 0 &&
+          shouldTreatPositiveAmountAsExpense(rowText, description)
+        ) {
+          type = "expense";
+        }
       } else if (singleAmountConvention === "always_expense") {
         type = "expense";
         amount = Math.abs(signed);
@@ -325,27 +341,26 @@ export function parseBankCsv(
       type = "expense";
     }
 
-    let rowCurrency: CurrencyCode = defaultCurrency;
+    const amountParts =
+      mode === "deb_cred" && iDeb !== undefined && iCred !== undefined
+        ? [
+            String(cells[iDeb] ?? "").trim(),
+            String(cells[iCred] ?? "").trim(),
+          ]
+        : iMonto !== undefined
+          ? [String(cells[iMonto] ?? "").trim()]
+          : [];
     const fromCol =
       iMoneda !== undefined
         ? parseCurrencyCell(String(cells[iMoneda] ?? ""))
         : undefined;
-    if (fromCol) {
-      rowCurrency = fromCol;
-    } else if (mode === "deb_cred" && iDeb !== undefined && iCred !== undefined) {
-      const rawD = String(cells[iDeb] ?? "").trim();
-      const rawC = String(cells[iCred] ?? "").trim();
-      const hint = inferCurrencyFromMoneyStrings(rawD, rawC);
-      if (hint) rowCurrency = hint;
-    } else if (iMonto !== undefined) {
-      const rawM = String(cells[iMonto] ?? "").trim();
-      const hint = inferCurrencyFromMoneyStrings(rawM);
-      if (hint) rowCurrency = hint;
-    }
-    if (!fromCol) {
-      const subHint = inferCurrencyFromDescriptionAndHints(description);
-      if (subHint) rowCurrency = subHint;
-    }
+    const rowCurrency = resolveImportRowCurrency(
+      description,
+      amountParts,
+      [rowText],
+      defaultCurrency,
+      fromCol,
+    );
 
     out.push({
       line,

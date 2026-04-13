@@ -258,6 +258,11 @@ export function MovementsTable({
           <h2 className="text-sm font-medium text-zinc-300">
             Movimientos en el período seleccionado ({slice.length})
           </h2>
+          <p className="mt-1 text-xs text-zinc-500">
+            <span className="text-emerald-400/90">Ingreso</span> suma al período ·{" "}
+            <span className="text-rose-300/90">Egreso</span> resta · Moneda del
+            importe (revisá importaciones TC vs cuenta en pesos).
+          </p>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full min-w-[720px] text-left text-sm">
@@ -268,7 +273,9 @@ export function MovementsTable({
                 <th className="px-4 py-3">Descripción</th>
                 <th className="px-4 py-3">Categoría</th>
                 <th className="px-4 py-3">Medio</th>
-                <th className="px-4 py-3">Mon.</th>
+                <th className="px-4 py-3" title="Moneda del movimiento (UYU vs USD)">
+                  Moneda
+                </th>
                 <th className="px-4 py-3 text-right">Monto</th>
                 <th className="px-4 py-3 text-right">Resumen</th>
                 <th className="px-4 py-3" />
@@ -314,8 +321,22 @@ export function MovementsTable({
                       ? METHODS.find((m) => m.id === t.paymentMethod)?.label
                       : "—"}
                   </td>
-                  <td className="px-4 py-3 text-xs text-zinc-500">
-                    {txCurrency(t, settings)}
+                  <td className="px-4 py-3">
+                    <span
+                      className={cn(
+                        "inline-flex rounded px-1.5 py-0.5 font-mono text-[11px] font-medium",
+                        txCurrency(t, settings) === "USD" &&
+                          "bg-amber-500/15 text-amber-300",
+                        txCurrency(t, settings) === "UYU" &&
+                          "bg-sky-500/15 text-sky-300",
+                        txCurrency(t, settings) === "EUR" &&
+                          "bg-violet-500/15 text-violet-300",
+                        !["USD", "UYU", "EUR"].includes(txCurrency(t, settings)) &&
+                          "bg-zinc-700/50 text-zinc-400",
+                      )}
+                    >
+                      {txCurrency(t, settings)}
+                    </span>
                   </td>
                   <td
                     className={cn(

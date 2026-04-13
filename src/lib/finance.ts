@@ -82,6 +82,33 @@ export function shouldReclassifyIncomeAsCardExpense(t: {
 }
 
 /**
+ * Extractos con importe positivo = cargo (TC / compra): pasar a egreso cuando el
+ * texto lo indica, aunque no venga con signo negativo.
+ */
+export function shouldTreatPositiveAmountAsExpense(
+  contextLine: string,
+  description: string,
+): boolean {
+  const desc = description.trim();
+  if (
+    shouldReclassifyIncomeAsCardExpense({ type: "income", description: desc })
+  ) {
+    return true;
+  }
+  const u = (contextLine + " " + desc).toUpperCase();
+  if (
+    /\bTRASPASO\s+DE\b/i.test(desc) ||
+    /^CRE\.?\s+CAMBIOS\b/i.test(desc) ||
+    /\b(?:DEPOSITO|DEPÓSITO|ACREDIT|SUELDO|HABERES|AGUINALDO)\b/i.test(u)
+  ) {
+    return false;
+  }
+  return /\b(COMPRA|CONSUMO|DLO\*|DLO\s*\*|CUOTA\s+\d+\s*\/\s*\d+|TARJETA\s*\d|TARJ\s+VISA|VISA\s+[\d\*X]|MASTERCARD|DEBITO\b|DEB\.|INTERESES|COMISION|MOVISTAR|ANTEL|CLARO|PEDIDOSYA|EXTRACTO\s+TC)/i.test(
+    u,
+  );
+}
+
+/**
  * Corrige filas ya guardadas: moneda USD para SaaS (OpenAI, Cursor, etc.),
  * ingreso→gasto TC si aplica, y saca “fuera del resumen” en gastos SaaS en USD.
  */

@@ -165,7 +165,7 @@ export function CsvImport() {
             className="rounded-lg border border-zinc-700 bg-zinc-950 px-3 py-2 text-white"
           >
             <option value="signed">
-              Signo: negativo = egreso, positivo = ingreso
+              Signo + contexto: negativo = egreso; positivo = ingreso salvo compras/TC detectadas
             </option>
             <option value="always_expense">Todo es egreso (solo gastos)</option>
             <option value="always_income">Todo es ingreso (solo ingresos)</option>

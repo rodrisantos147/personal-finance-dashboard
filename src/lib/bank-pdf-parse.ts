@@ -1,8 +1,10 @@
 import type { CsvImportResult, CsvImportPreviewRow } from "./csv-import";
-import { inferCurrencyFromDescriptionAndHints } from "./currency-hints";
+import { resolveImportRowCurrency } from "./currency-hints";
 import { parseDateFlexible, parseMoneyAR } from "./csv-import";
-import { shouldReclassifyIncomeAsCardExpense } from "./finance";
-import type { CurrencyCode } from "./types";
+import {
+  shouldReclassifyIncomeAsCardExpense,
+  shouldTreatPositiveAmountAsExpense,
+} from "./finance";
 import type { TransactionType } from "./types";
 
 const SKIP_LINE =
@@ -188,6 +190,12 @@ export function parseItauUruguayPdfText(text: string): {
       if (signed < 0) {
         type = "expense";
       }
+      if (
+        signed > 0 &&
+        shouldTreatPositiveAmountAsExpense(`${line} ${description}`, descShort)
+      ) {
+        type = "expense";
+      }
     }
 
     const d = new Date(year, mo, day);
@@ -201,13 +209,11 @@ export function parseItauUruguayPdfText(text: string): {
       type = "expense";
     }
 
-    const rowCur: CurrencyCode =
-      inferCurrencyFromDescriptionAndHints(
-        line,
-        description,
-        amountStr1,
-        amountStr2 ?? "",
-      ) ?? "UYU";
+    const rowCur = resolveImportRowCurrency(
+      descShort,
+      [amountStr1, amountStr2 ?? ""],
+      [line, description],
+    );
 
     rows.push({
       line: i,
@@ -256,14 +262,16 @@ function parseSingleLine(line: string, lineNo: number): CsvImportPreviewRow | nu
 
   let type: TransactionType = signed < 0 ? "expense" : "income";
   const desc = descPart.slice(0, 280) || "Movimiento";
+  if (signed > 0 && shouldTreatPositiveAmountAsExpense(t, desc)) {
+    type = "expense";
+  }
   if (
     type === "income" &&
     shouldReclassifyIncomeAsCardExpense({ type, description: desc })
   ) {
     type = "expense";
   }
-  const cur: CurrencyCode =
-    inferCurrencyFromDescriptionAndHints(t, amountRaw) ?? "UYU";
+  const cur = resolveImportRowCurrency(desc, [amountRaw], [t]);
   return {
     line: lineNo,
     date: d.toISOString(),
@@ -305,8 +313,7 @@ function parseDebitCreditLine(line: string, lineNo: number): CsvImportPreviewRow
   const d = parseDateFlexible(datePart);
   if (!d) return null;
 
-  const cur: CurrencyCode =
-    inferCurrencyFromDescriptionAndHints(t, rawDeb, rawCred) ?? "UYU";
+  const cur = resolveImportRowCurrency(desc, [rawDeb, rawCred], [t]);
 
   if (absDeb > 0) {
     return {
