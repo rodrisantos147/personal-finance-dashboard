@@ -13,7 +13,11 @@ export function txCurrency(
   t: Transaction,
   settings: AppSettings,
 ): CurrencyCode {
-  return t.currency ?? resolveDefaultCurrency(settings);
+  const raw = t.currency ?? resolveDefaultCurrency(settings);
+  if (raw === "ARS" && (settings.treatArsAsUyu ?? true)) {
+    return "UYU";
+  }
+  return raw;
 }
 
 export function formatMoney(

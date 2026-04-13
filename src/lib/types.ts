@@ -74,6 +74,12 @@ export interface AppSettings {
    * comparación vs período anterior) cuando la moneda del informe es UYU o USD.
    */
   referenceUyuPerUsd?: number;
+  /**
+   * Si es true (por defecto), los movimientos guardados como ARS se tratan como UYU
+   * en totales, Consumos y tablas. Útil cuando el import marcó mal “pesos” como ARS.
+   * Desactivá solo si usás pesos argentinos reales.
+   */
+  treatArsAsUyu?: boolean;
   /** @deprecated usar defaultCurrency */
   currency?: string;
 }

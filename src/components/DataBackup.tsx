@@ -122,6 +122,26 @@ export function DataBackup() {
             <option value="USD">USD — dólares estadounidenses</option>
           </select>
         </label>
+        <label className="mt-4 flex cursor-pointer items-start gap-3 text-sm text-zinc-300">
+          <input
+            type="checkbox"
+            className="mt-1 rounded border-zinc-600"
+            checked={settings.treatArsAsUyu ?? true}
+            onChange={(e) =>
+              setSettings({ treatArsAsUyu: e.target.checked })
+            }
+          />
+          <span>
+            <span className="font-medium text-zinc-200">
+              Tratar movimientos en ARS como pesos uruguayos (UYU)
+            </span>
+            <span className="mt-1 block text-xs text-zinc-500">
+              Si tus gastos solo son en $U y USD pero aparecen en Consumos como
+              &quot;Otras monedas&quot;, suele ser que el import los guardó como ARS.
+              Desactivá esta opción solo si registrás pesos argentinos de verdad.
+            </span>
+          </span>
+        </label>
         <label className="mt-4 flex max-w-sm flex-col gap-1 text-sm">
           <span className="text-zinc-400">
             Tipo de cambio referencia (pesos por 1 USD)
@@ -151,9 +171,8 @@ export function DataBackup() {
             className="rounded-lg border border-zinc-700 bg-zinc-950 px-3 py-2 text-white"
           />
           <span className="text-xs text-zinc-600">
-            Opcional. En el resumen aparece un bloque extra con ingresos, gastos y
-            resultado combinados en UYU (USD multiplicado por este valor). No cambia
-            los números por moneda ni las gráficas.
+            Opcional. Mezcla UYU y USD en KPI, histórico y comparación con el período
+            anterior cuando el informe está en pesos o dólares.
           </span>
         </label>
       </section>

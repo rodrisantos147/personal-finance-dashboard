@@ -151,7 +151,8 @@ export function inferCurrencyFromMoneyStrings(
   for (const raw of raws) {
     const u = raw.toUpperCase();
     if (/\b(US\$|U\$S|USD)\b/.test(u) || u.includes("US$")) return "USD";
-    if (/\bARS\b/.test(u)) return "ARS";
+    // No inferir ARS desde texto: en extractos UY suele confundirse con pesos locales.
+    // ARS solo si la columna moneda lo indica explícitamente (parseCurrencyCell).
     if (/\bEUR\b|€/.test(u)) return "EUR";
   }
   return undefined;
