@@ -13,9 +13,9 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Finanzas — Dashboard",
+  title: "Finanzas — Itaú y resumen personal",
   description:
-    "Ingresos, egresos, tarjetas, lista de compras y proyecciones personales.",
+    "Importación de extractos Itaú Uruguay (Visa y cuenta), ingresos, egresos y reportes en pesos o dólares.",
 };
 
 export default function RootLayout({

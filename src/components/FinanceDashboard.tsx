@@ -347,9 +347,10 @@ export function FinanceDashboard() {
             Dashboard
           </h1>
           <p className="mt-2 max-w-xl text-sm text-zinc-400">
-            Ingresos y egresos, comparativas, tarjetas, lista de deseos y
-            consejos. Los datos se guardan en este navegador; podés exportar un
-            respaldo desde Datos.
+            Importá PDF de <strong className="text-zinc-300">Itaú Uruguay</strong>{" "}
+            (Visa / cuenta): la app detecta movimientos en el texto del
+            extracto. Ingresos, egresos, comparativas y lista de deseos. Los
+            datos quedan en este navegador; respaldo JSON en Datos.
           </p>
         </div>
       </header>

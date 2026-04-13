@@ -158,9 +158,11 @@ export function StatementImport() {
         Importar extracto (CSV o PDF)
       </h2>
       <p className="mt-2 text-sm text-zinc-500">
-        Un solo archivo: CSV del banco o PDF con texto (no escaneado). Si un
-        formato falla, la app intenta el otro automáticamente. Los duplicados se
-        omiten al agregar y se limpian filas repetidas en el historial.
+        Un solo archivo: CSV o PDF con texto. Los PDF de{" "}
+        <strong className="text-zinc-400">Itaú Uruguay</strong> (estado Visa
+        ****8002, resumen cuenta URGP, etc.) se interpretan con un parser
+        dedicado. Si un formato falla, se prueba el otro. Los duplicados se
+        unifican al importar.
       </p>
 
       <label className="mt-4 block text-sm text-zinc-400">

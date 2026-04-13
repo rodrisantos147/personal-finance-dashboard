@@ -1,5 +1,6 @@
 import type { CsvImportResult, CsvImportPreviewRow } from "./csv-import";
 import { resolveImportRowCurrency } from "./currency-hints";
+import { parseItauStatementFromPdfText } from "./itau-statement";
 import { parseDateFlexible, parseMoneyAR } from "./csv-import";
 import {
   shouldReclassifyIncomeAsCardExpense,
@@ -351,6 +352,11 @@ function parseDebitCreditLine(line: string, lineNo: number): CsvImportPreviewRow
  * Intenta extraer movimientos de texto copiado desde PDF (Itaú y similares).
  */
 export function parseBankStatementPdfText(text: string): CsvImportResult {
+  const itauUnified = parseItauStatementFromPdfText(text);
+  if (itauUnified.ok && itauUnified.rows.length > 0) {
+    return itauUnified;
+  }
+
   const rawLines = text
     .split(/\n/)
     .map((l) => l.replace(/\s+/g, " ").trim())
