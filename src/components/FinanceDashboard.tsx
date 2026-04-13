@@ -37,8 +37,7 @@ import {
   filterByDateRange,
   monthlyBuckets,
   pendingTotals,
-  sumExpense,
-  sumIncome,
+  sumIncomeExpenseForReport,
 } from "@/lib/finance";
 import { formatMoneyWithSettings, resolveDefaultCurrency } from "@/lib/format";
 import type { CurrencyCode } from "@/lib/types";
@@ -111,12 +110,8 @@ export function FinanceDashboard() {
     }
   }, [usedCurrencies, reportCurrency, settings]);
 
-  const income = useMemo(
-    () => sumIncome(slice, settings, reportCurrency),
-    [slice, settings, reportCurrency],
-  );
-  const expense = useMemo(
-    () => sumExpense(slice, settings, reportCurrency),
+  const { income, expense } = useMemo(
+    () => sumIncomeExpenseForReport(slice, settings, reportCurrency),
     [slice, settings, reportCurrency],
   );
   const net = income - expense;
@@ -587,8 +582,13 @@ export function FinanceDashboard() {
             </h2>
             <p className="mb-3 text-xs text-zinc-600">
               Todos los montos en{" "}
-              <strong className="text-zinc-400">{reportCurrency}</strong>. La
-              última barra es el mes que termina en{" "}
+              <strong className="text-zinc-400">{reportCurrency}</strong>
+              {settings.referenceUyuPerUsd != null &&
+              settings.referenceUyuPerUsd > 0 &&
+              (reportCurrency === "UYU" || reportCurrency === "USD")
+                ? " (ingresos y gastos en UYU y USD combinados con el tipo de referencia en Datos)."
+                : "."}{" "}
+              La última barra es el mes que termina en{" "}
               {chartAnchor.toLocaleDateString("es-UY", {
                 month: "long",
                 year: "numeric",

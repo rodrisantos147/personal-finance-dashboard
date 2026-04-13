@@ -57,6 +57,43 @@ export function sumExpense(
 }
 
 /**
+ * Ingresos y gastos en la moneda del informe. Si hay `referenceUyuPerUsd` y la
+ * moneda es UYU o USD, combina ambas (pesos + dólares × tipo o la inversa), igual
+ * que el total de referencia en pesos. Así el histórico y el KPI no “pierden”
+ * ingresos en la otra moneda. Sin tipo válido o con informe en ARS/EUR, solo se
+ * suman movimientos en esa moneda.
+ */
+export function sumIncomeExpenseForReport(
+  transactions: Transaction[],
+  settings: AppSettings,
+  reportCurrency: CurrencyCode,
+): { income: number; expense: number } {
+  const fx = settings.referenceUyuPerUsd;
+  if (
+    fx != null &&
+    Number.isFinite(fx) &&
+    fx > 0 &&
+    (reportCurrency === "UYU" || reportCurrency === "USD")
+  ) {
+    const iu = sumIncome(transactions, settings, "UYU");
+    const eu = sumExpense(transactions, settings, "UYU");
+    const id = sumIncome(transactions, settings, "USD");
+    const ed = sumExpense(transactions, settings, "USD");
+    if (reportCurrency === "UYU") {
+      return { income: iu + id * fx, expense: eu + ed * fx };
+    }
+    return {
+      income: iu / fx + id,
+      expense: eu / fx + ed,
+    };
+  }
+  return {
+    income: sumIncome(transactions, settings, reportCurrency),
+    expense: sumExpense(transactions, settings, reportCurrency),
+  };
+}
+
+/**
  * Ingresos, gastos y resultado del período expresados en UYU de referencia:
  * montos en UYU + montos en USD × `uyuPerUsd`.
  * No incluye otras monedas (ARS/EUR). Devuelve `null` si no hay tipo de cambio válido.
@@ -67,12 +104,11 @@ export function combinedPeriodTotalsReferenceUyu(
   uyuPerUsd: number,
 ): { income: number; expense: number; net: number } | null {
   if (!Number.isFinite(uyuPerUsd) || uyuPerUsd <= 0) return null;
-  const iu = sumIncome(transactions, settings, "UYU");
-  const eu = sumExpense(transactions, settings, "UYU");
-  const id = sumIncome(transactions, settings, "USD");
-  const ed = sumExpense(transactions, settings, "USD");
-  const income = iu + id * uyuPerUsd;
-  const expense = eu + ed * uyuPerUsd;
+  const { income, expense } = sumIncomeExpenseForReport(
+    transactions,
+    { ...settings, referenceUyuPerUsd: uyuPerUsd },
+    "UYU",
+  );
   return { income, expense, net: income - expense };
 }
 
@@ -421,8 +457,7 @@ export function projectedSurplusForPeriod(
 ) {
   const slice = filterByDateRange(transactions, from, to);
   const horizon = endOfMonth(new Date());
-  const income = sumIncome(slice, settings, currency);
-  const expense = sumExpense(slice, settings, currency);
+  const { income, expense } = sumIncomeExpenseForReport(slice, settings, currency);
   const p = pendingTotals(transactions, settings, currency);
   const f = estimateFutureIncome(
     transactions,
@@ -467,11 +502,16 @@ export function monthlyBuckets(
     const to = endOfMonth(ref);
     const slice = filterByDateRange(transactions, from, to);
     const key = `${from.getFullYear()}-${String(from.getMonth() + 1).padStart(2, "0")}`;
+    const { income, expense } = sumIncomeExpenseForReport(
+      slice,
+      settings,
+      currency,
+    );
     buckets.push({
       key,
       label: from.toLocaleDateString("es-UY", { month: "short", year: "2-digit" }),
-      income: sumIncome(slice, settings, currency),
-      expense: sumExpense(slice, settings, currency),
+      income,
+      expense,
     });
   }
   return buckets;
@@ -489,10 +529,12 @@ export function compareToPreviousPeriod(
   const prevFrom = addDays(prevTo, -Math.round(len / (1000 * 60 * 60 * 24)));
   const cur = filterByDateRange(transactions, from, to);
   const prev = filterByDateRange(transactions, prevFrom, prevTo);
-  const curIncome = sumIncome(cur, settings, currency);
-  const curExpense = sumExpense(cur, settings, currency);
-  const prevIncome = sumIncome(prev, settings, currency);
-  const prevExpense = sumExpense(prev, settings, currency);
+  const curTotals = sumIncomeExpenseForReport(cur, settings, currency);
+  const prevTotals = sumIncomeExpenseForReport(prev, settings, currency);
+  const curIncome = curTotals.income;
+  const curExpense = curTotals.expense;
+  const prevIncome = prevTotals.income;
+  const prevExpense = prevTotals.expense;
   /** Variación en % con un decimal (evita −100% cuando en realidad hubo algo de ingreso/gasto). */
   const pct = (a: number, b: number) =>
     b === 0 ? (a === 0 ? 0 : 100) : Math.round(((a - b) / b) * 1000) / 10;

@@ -70,8 +70,8 @@ export interface AppSettings {
   /** Saldo inicial antes del primer movimiento registrado */
   initialBalance: number;
   /**
-   * Pesos uruguayos por 1 USD — solo para el total de referencia que combina monedas.
-   * No afecta los totales por moneda ni los gráficos.
+   * Pesos uruguayos por 1 USD — combina UYU + USD en el informe (KPI, histórico,
+   * comparación vs período anterior) cuando la moneda del informe es UYU o USD.
    */
   referenceUyuPerUsd?: number;
   /** @deprecated usar defaultCurrency */
