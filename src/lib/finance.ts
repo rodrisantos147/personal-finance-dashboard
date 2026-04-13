@@ -56,12 +56,39 @@ export function sumExpense(
     .reduce((s, t) => s + t.amount, 0);
 }
 
+/** Ingresos en monedas distintas de UYU y USD (p. ej. ARS, EUR), al nominal. */
+function sumIncomeNonUyuUsd(
+  transactions: Transaction[],
+  settings: AppSettings,
+): number {
+  let s = 0;
+  for (const t of transactions) {
+    if (t.type !== "income") continue;
+    const c = txCurrency(t, settings);
+    if (c !== "UYU" && c !== "USD") s += t.amount;
+  }
+  return s;
+}
+
+function sumExpenseNonUyuUsd(
+  transactions: Transaction[],
+  settings: AppSettings,
+): number {
+  let s = 0;
+  for (const t of transactions) {
+    if (t.type !== "expense") continue;
+    const c = txCurrency(t, settings);
+    if (c !== "UYU" && c !== "USD") s += t.amount;
+  }
+  return s;
+}
+
 /**
  * Ingresos y gastos en la moneda del informe. Si hay `referenceUyuPerUsd` y la
- * moneda es UYU o USD, combina ambas (pesos + dólares × tipo o la inversa), igual
- * que el total de referencia en pesos. Así el histórico y el KPI no “pierden”
- * ingresos en la otra moneda. Sin tipo válido o con informe en ARS/EUR, solo se
- * suman movimientos en esa moneda.
+ * moneda es UYU o USD, combina UYU + USD con conversión. Las demás monedas (ARS,
+ * EUR…) se suman al nominal en la unidad del informe (aproximado, sin cruce
+ * adicional). Sin tipo válido, en UYU/USD también se incluyen esas “otras” al
+ * nominal para no mostrar 0 cuando solo hay ARS/EUR.
  */
 export function sumIncomeExpenseForReport(
   transactions: Transaction[],
@@ -69,6 +96,9 @@ export function sumIncomeExpenseForReport(
   reportCurrency: CurrencyCode,
 ): { income: number; expense: number } {
   const fx = settings.referenceUyuPerUsd;
+  const oi = sumIncomeNonUyuUsd(transactions, settings);
+  const oe = sumExpenseNonUyuUsd(transactions, settings);
+
   if (
     fx != null &&
     Number.isFinite(fx) &&
@@ -80,13 +110,27 @@ export function sumIncomeExpenseForReport(
     const id = sumIncome(transactions, settings, "USD");
     const ed = sumExpense(transactions, settings, "USD");
     if (reportCurrency === "UYU") {
-      return { income: iu + id * fx, expense: eu + ed * fx };
+      return { income: iu + id * fx + oi, expense: eu + ed * fx + oe };
     }
     return {
-      income: iu / fx + id,
-      expense: eu / fx + ed,
+      income: iu / fx + id + oi,
+      expense: eu / fx + ed + oe,
     };
   }
+
+  if (reportCurrency === "UYU") {
+    return {
+      income: sumIncome(transactions, settings, "UYU") + oi,
+      expense: sumExpense(transactions, settings, "UYU") + oe,
+    };
+  }
+  if (reportCurrency === "USD") {
+    return {
+      income: sumIncome(transactions, settings, "USD") + oi,
+      expense: sumExpense(transactions, settings, "USD") + oe,
+    };
+  }
+
   return {
     income: sumIncome(transactions, settings, reportCurrency),
     expense: sumExpense(transactions, settings, reportCurrency),
@@ -95,8 +139,8 @@ export function sumIncomeExpenseForReport(
 
 /**
  * Ingresos, gastos y resultado del período expresados en UYU de referencia:
- * montos en UYU + montos en USD × `uyuPerUsd`.
- * No incluye otras monedas (ARS/EUR). Devuelve `null` si no hay tipo de cambio válido.
+ * montos en UYU + USD × `uyuPerUsd` + otras monedas al nominal (ver
+ * `sumIncomeExpenseForReport`). Devuelve `null` si no hay tipo de cambio válido.
  */
 export function combinedPeriodTotalsReferenceUyu(
   transactions: Transaction[],

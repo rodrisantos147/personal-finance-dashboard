@@ -373,6 +373,13 @@ export function FinanceDashboard() {
               completo</strong> seleccionado (del 1 al último día de ese mes), no un
               mes “desde hoy”.
             </p>
+            {slice.length === 0 && (
+              <p className="w-full text-xs text-amber-200/90">
+                No hay movimientos con fecha en este mes: los totales serán cero.
+                Pasá a otro mes (por ejemplo donde importaste extractos) o cargá
+                movimientos en Movimientos / Datos.
+              </p>
+            )}
           </div>
         ) : (
           <div className="flex flex-wrap items-center gap-3">
