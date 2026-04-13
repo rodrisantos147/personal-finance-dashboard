@@ -150,6 +150,7 @@ export function CsvImport() {
           >
             <option value="UYU">UYU ($)</option>
             <option value="USD">USD (US$)</option>
+            <option value="EUR">EUR (€)</option>
           </select>
         </label>
         <label className="flex flex-col gap-1 text-sm">

@@ -17,6 +17,7 @@ const METHODS: { id: PaymentMethod; label: string }[] = [
 const CURS: { id: CurrencyCode; label: string }[] = [
   { id: "UYU", label: "UYU ($)" },
   { id: "USD", label: "USD (US$)" },
+  { id: "EUR", label: "EUR (€)" },
 ];
 
 export function MovementsTable({

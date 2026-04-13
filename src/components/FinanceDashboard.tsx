@@ -64,6 +64,7 @@ function fmtDeltaPct(n: number) {
 const REPORT_CURRENCIES: { id: CurrencyCode; label: string }[] = [
   { id: "UYU", label: "Pesos (UYU)" },
   { id: "USD", label: "Dólares (USD)" },
+  { id: "EUR", label: "Euros (EUR)" },
 ];
 
 export function FinanceDashboard() {

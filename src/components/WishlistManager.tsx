@@ -17,6 +17,7 @@ const PRIORITIES: { id: WishlistPriority; label: string }[] = [
 const WISH_CUR: { id: CurrencyCode; label: string }[] = [
   { id: "UYU", label: "UYU" },
   { id: "USD", label: "USD" },
+  { id: "EUR", label: "EUR" },
 ];
 
 export function WishlistManager({
@@ -64,7 +65,7 @@ export function WishlistManager({
       <section className="rounded-xl border border-zinc-800 bg-zinc-900/40 p-6">
         <h2 className="text-lg font-medium text-white">Lista de deseos</h2>
         <p className="mt-2 text-sm text-zinc-500">
-          Cada ítem tiene moneda (UYU o USD). El veredicto usa el superávit
+          Cada ítem tiene moneda (UYU, USD o EUR). El veredicto usa el superávit
           proyectado en esa moneda. Recurrentes activos:{" "}
           {Object.entries(monthlyExtraByCur)
             .map(([c, n]) => `${fmt(n, c as CurrencyCode)}/${c}`)

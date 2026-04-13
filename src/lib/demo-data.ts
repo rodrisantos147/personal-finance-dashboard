@@ -84,7 +84,7 @@ export function buildDemoSnapshot(referenceDate: Date = new Date()): DemoSnapsho
       });
     }
 
-    // Gastos variados (montos demo creíbles en ARS)
+    // Gastos variados (montos demo en pesos / USD)
     push(2, {
       type: "expense",
       amount: 28_000 + m * 800,

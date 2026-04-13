@@ -2,8 +2,8 @@ export type PaymentMethod = "debit" | "credit" | "cash" | "transfer";
 
 export type TransactionType = "income" | "expense";
 
-/** ISO 4217 — UYU pesos uruguayos, USD dólares US. */
-export type CurrencyCode = "UYU" | "USD" | "ARS" | "EUR";
+/** Monedas admitidas: pesos uruguayos, dólares US, euros (viajes / compras EU). */
+export type CurrencyCode = "UYU" | "USD" | "EUR";
 
 export interface Transaction {
   id: string;
@@ -79,12 +79,6 @@ export interface AppSettings {
    * comparación vs período anterior) cuando la moneda del informe es UYU o USD.
    */
   referenceUyuPerUsd?: number;
-  /**
-   * Si es true (por defecto), los movimientos guardados como ARS se tratan como UYU
-   * en totales, Consumos y tablas. Útil cuando el import marcó mal “pesos” como ARS.
-   * Desactivá solo si usás pesos argentinos reales.
-   */
-  treatArsAsUyu?: boolean;
   /** @deprecated usar defaultCurrency */
   currency?: string;
 }

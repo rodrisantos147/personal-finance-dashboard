@@ -3,7 +3,10 @@
 import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
 import { buildDemoSnapshot } from "./demo-data";
-import { resolveDefaultCurrency } from "./format";
+import {
+  normalizeStoredCurrency,
+  resolveDefaultCurrency,
+} from "./format";
 import {
   dedupeTransactionsByKey,
   transactionDedupeKey,
@@ -33,6 +36,17 @@ function uid() {
     return crypto.randomUUID();
   }
   return `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+}
+
+/** Quita opciones viejas y normaliza moneda por defecto (UYU / USD / EUR). */
+function scrubSettings(settings: AppSettings): AppSettings {
+  const out = { ...settings };
+  delete (out as Record<string, unknown>).treatArsAsUyu;
+  out.defaultCurrency = normalizeStoredCurrency(
+    String(out.defaultCurrency ?? "UYU"),
+    "UYU",
+  );
+  return out;
 }
 
 interface FinanceState {
@@ -96,19 +110,28 @@ export const useFinanceStore = create<FinanceState>()(
       ...defaultState,
 
       setSettings: (partial) =>
-        set((s) => ({ settings: { ...s.settings, ...partial } })),
+        set((s) => ({
+          settings: scrubSettings({ ...s.settings, ...partial }),
+        })),
 
       addTransaction: (t) =>
         set((s) => {
           const dc = resolveDefaultCurrency(s.settings);
-          const k = transactionDedupeKey(t, dc);
+          const normalized: Omit<Transaction, "id"> = {
+            ...t,
+            currency: normalizeStoredCurrency(
+              t.currency as string | undefined,
+              dc,
+            ),
+          };
+          const k = transactionDedupeKey(normalized, dc);
           if (s.transactions.some((x) => transactionDedupeKey(x, dc) === k)) {
             return s;
           }
           return {
             transactions: [
               ...s.transactions,
-              { ...t, id: uid() },
+              { ...normalized, id: uid() },
             ].sort((a, b) => b.date.localeCompare(a.date)),
           };
         }),
@@ -122,13 +145,20 @@ export const useFinanceStore = create<FinanceState>()(
         const fresh: Transaction[] = [];
         let skippedDuplicates = 0;
         for (const t of items) {
-          const k = transactionDedupeKey(t, dc);
+          const normalized: Omit<Transaction, "id"> = {
+            ...t,
+            currency: normalizeStoredCurrency(
+              t.currency as string | undefined,
+              dc,
+            ),
+          };
+          const k = transactionDedupeKey(normalized, dc);
           if (keys.has(k)) {
             skippedDuplicates++;
             continue;
           }
           keys.add(k);
-          fresh.push({ ...t, id: uid() });
+          fresh.push({ ...normalized, id: uid() });
         }
         set({
           transactions: [...fresh, ...s.transactions].sort((a, b) =>
@@ -147,11 +177,24 @@ export const useFinanceStore = create<FinanceState>()(
       },
 
       updateTransaction: (id, partial) =>
-        set((s) => ({
-          transactions: s.transactions
-            .map((x) => (x.id === id ? { ...x, ...partial } : x))
-            .sort((a, b) => b.date.localeCompare(a.date)),
-        })),
+        set((s) => {
+          const dc = resolveDefaultCurrency(s.settings);
+          const norm =
+            partial.currency !== undefined
+              ? {
+                  ...partial,
+                  currency: normalizeStoredCurrency(
+                    partial.currency as string,
+                    dc,
+                  ),
+                }
+              : partial;
+          return {
+            transactions: s.transactions
+              .map((x) => (x.id === id ? { ...x, ...norm } : x))
+              .sort((a, b) => b.date.localeCompare(a.date)),
+          };
+        }),
 
       removeTransaction: (id) =>
         set((s) => ({
@@ -179,23 +222,43 @@ export const useFinanceStore = create<FinanceState>()(
         })),
 
       addWishlist: (w) =>
-        set((s) => ({
-          wishlist: [
-            ...s.wishlist,
-            {
-              ...w,
-              id: uid(),
-              createdAt: new Date().toISOString(),
-            },
-          ],
-        })),
+        set((s) => {
+          const dc = resolveDefaultCurrency(s.settings);
+          return {
+            wishlist: [
+              ...s.wishlist,
+              {
+                ...w,
+                id: uid(),
+                createdAt: new Date().toISOString(),
+                currency: normalizeStoredCurrency(
+                  w.currency as string | undefined,
+                  dc,
+                ),
+              },
+            ],
+          };
+        }),
 
       updateWishlist: (id, partial) =>
-        set((s) => ({
-          wishlist: s.wishlist.map((x) =>
-            x.id === id ? { ...x, ...partial } : x,
-          ),
-        })),
+        set((s) => {
+          const dc = resolveDefaultCurrency(s.settings);
+          const norm =
+            partial.currency !== undefined
+              ? {
+                  ...partial,
+                  currency: normalizeStoredCurrency(
+                    partial.currency as string,
+                    dc,
+                  ),
+                }
+              : partial;
+          return {
+            wishlist: s.wishlist.map((x) =>
+              x.id === id ? { ...x, ...norm } : x,
+            ),
+          };
+        }),
 
       removeWishlist: (id) =>
         set((s) => ({
@@ -203,16 +266,42 @@ export const useFinanceStore = create<FinanceState>()(
         })),
 
       addRecurringIncome: (r) =>
-        set((s) => ({
-          recurringIncomes: [...s.recurringIncomes, { ...r, id: uid() }],
-        })),
+        set((s) => {
+          const dc = resolveDefaultCurrency(s.settings);
+          return {
+            recurringIncomes: [
+              ...s.recurringIncomes,
+              {
+                ...r,
+                id: uid(),
+                currency: normalizeStoredCurrency(
+                  r.currency as string | undefined,
+                  dc,
+                ),
+              },
+            ],
+          };
+        }),
 
       updateRecurringIncome: (id, partial) =>
-        set((s) => ({
-          recurringIncomes: s.recurringIncomes.map((x) =>
-            x.id === id ? { ...x, ...partial } : x,
-          ),
-        })),
+        set((s) => {
+          const dc = resolveDefaultCurrency(s.settings);
+          const norm =
+            partial.currency !== undefined
+              ? {
+                  ...partial,
+                  currency: normalizeStoredCurrency(
+                    partial.currency as string,
+                    dc,
+                  ),
+                }
+              : partial;
+          return {
+            recurringIncomes: s.recurringIncomes.map((x) =>
+              x.id === id ? { ...x, ...norm } : x,
+            ),
+          };
+        }),
 
       removeRecurringIncome: (id) =>
         set((s) => ({
@@ -254,19 +343,24 @@ export const useFinanceStore = create<FinanceState>()(
         const rawSettings = data.settings as
           | (Partial<AppSettings> & { currency?: string })
           | undefined;
-        const mergedSettings: AppSettings = {
+        const mergedSettings = scrubSettings({
           ...defaultState.settings,
           ...rawSettings,
-          defaultCurrency:
+          defaultCurrency: normalizeStoredCurrency(
             rawSettings?.defaultCurrency ??
-            (rawSettings?.currency as CurrencyCode | undefined) ??
+              (rawSettings?.currency as string | undefined) ??
+              "UYU",
             "UYU",
+          ),
           locale: rawSettings?.locale ?? defaultState.settings.locale,
-        };
+        });
         const dc = mergedSettings.defaultCurrency;
         const rawTx = (data.transactions ?? []).map((t) => ({
           ...t,
-          currency: t.currency ?? dc,
+          currency: normalizeStoredCurrency(
+            t.currency as string | undefined,
+            dc,
+          ),
         }));
         set({
           settings: mergedSettings,
@@ -274,11 +368,17 @@ export const useFinanceStore = create<FinanceState>()(
           creditCards: data.creditCards ?? [],
           wishlist: (data.wishlist ?? []).map((w) => ({
             ...w,
-            currency: w.currency ?? dc,
+            currency: normalizeStoredCurrency(
+              w.currency as string | undefined,
+              dc,
+            ),
           })),
           recurringIncomes: (data.recurringIncomes ?? []).map((r) => ({
             ...r,
-            currency: r.currency ?? dc,
+            currency: normalizeStoredCurrency(
+              r.currency as string | undefined,
+              dc,
+            ),
           })),
           expenseCategories:
             data.expenseCategories?.length ? data.expenseCategories : DEFAULT_CATEGORIES,
@@ -297,22 +397,47 @@ export const useFinanceStore = create<FinanceState>()(
       merge: (persisted, current) => {
         const p = (persisted ?? {}) as Partial<FinanceState>;
         const c = current as FinanceState;
-        const merged = { ...c, ...p };
-        merged.settings = {
+        const merged = { ...c, ...p } as FinanceState;
+        merged.settings = scrubSettings({
           ...defaultState.settings,
           ...c.settings,
           ...p.settings,
-          defaultCurrency:
-            p.settings?.defaultCurrency ??
-            c.settings?.defaultCurrency ??
-            defaultState.settings.defaultCurrency,
+          defaultCurrency: normalizeStoredCurrency(
+            String(
+              merged.settings.defaultCurrency ??
+                defaultState.settings.defaultCurrency,
+            ),
+            "UYU",
+          ),
           locale: p.settings?.locale ?? c.settings.locale,
-        };
-        const txs = merged.transactions ?? [];
-        merged.transactions =
-          txs.length > 0
-            ? dedupeTransactionsByKey(txs, merged.settings)
-            : txs;
+        });
+        const dc = merged.settings.defaultCurrency;
+        merged.transactions = dedupeTransactionsByKey(
+          (merged.transactions ?? []).map((t) => ({
+            ...t,
+            currency: normalizeStoredCurrency(
+              t.currency as string | undefined,
+              dc,
+            ),
+          })),
+          merged.settings,
+        );
+        merged.wishlist = (merged.wishlist ?? []).map((w) => ({
+          ...w,
+          currency: normalizeStoredCurrency(
+            w.currency as string | undefined,
+            dc,
+          ),
+        }));
+        merged.recurringIncomes = (merged.recurringIncomes ?? []).map(
+          (r) => ({
+            ...r,
+            currency: normalizeStoredCurrency(
+              r.currency as string | undefined,
+              dc,
+            ),
+          }),
+        );
         return merged;
       },
       partialize: (s) => ({

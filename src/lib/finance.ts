@@ -81,7 +81,7 @@ export function sumExpense(
     .reduce((s, t) => s + t.amount, 0);
 }
 
-/** Ingresos en monedas distintas de UYU y USD (p. ej. ARS, EUR), al nominal. */
+/** Ingresos en monedas distintas de UYU y USD (p. ej. EUR), al nominal. */
 function sumIncomeNonUyuUsd(
   transactions: Transaction[],
   settings: AppSettings,
@@ -110,10 +110,9 @@ function sumExpenseNonUyuUsd(
 
 /**
  * Ingresos y gastos en la moneda del informe. Si hay `referenceUyuPerUsd` y la
- * moneda es UYU o USD, combina UYU + USD con conversión. Las demás monedas (ARS,
- * EUR…) se suman al nominal en la unidad del informe (aproximado, sin cruce
- * adicional). Sin tipo válido, en UYU/USD también se incluyen esas “otras” al
- * nominal para no mostrar 0 cuando solo hay ARS/EUR.
+ * moneda es UYU o USD, combina UYU + USD con conversión. EUR u otras se suman al
+ * nominal en la unidad del informe (aproximado). Sin tipo válido, en UYU/USD
+ * también se incluyen esas “otras” al nominal.
  */
 export function sumIncomeExpenseForReport(
   transactions: Transaction[],
@@ -219,7 +218,7 @@ export type CategoryExpenseDualRow = {
   category: string;
   uyu: number;
   usd: number;
-  /** ARS, EUR u otras monedas distintas de UYU/USD */
+  /** EUR u otras monedas distintas de UYU/USD */
   other: number;
   /** Tarjeta de débito */
   uyuDebit: number;

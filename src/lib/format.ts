@@ -1,23 +1,32 @@
 import type { AppSettings, CurrencyCode, Transaction } from "./types";
 
+/**
+ * Normaliza moneda guardada o importada: códigos viejos pasan a UYU cuando
+ * correspondía a pesos uruguayos mal etiquetados.
+ */
+export function normalizeStoredCurrency(
+  raw: string | undefined,
+  fallback: CurrencyCode,
+): CurrencyCode {
+  if (raw === "UYU" || raw === "USD" || raw === "EUR") return raw;
+  if (raw === "ARS" || raw === "$AR") return "UYU";
+  if (raw === undefined || raw === "") return fallback;
+  return fallback;
+}
+
 /** Resuelve moneda por defecto (migración desde `settings.currency`). */
 export function resolveDefaultCurrency(settings: AppSettings): CurrencyCode {
-  return (
-    settings.defaultCurrency ??
-    (settings.currency as CurrencyCode | undefined) ??
-    "UYU"
-  );
+  const raw =
+    settings.defaultCurrency ?? (settings.currency as string | undefined);
+  return normalizeStoredCurrency(raw, "UYU");
 }
 
 export function txCurrency(
   t: Transaction,
   settings: AppSettings,
 ): CurrencyCode {
-  const raw = t.currency ?? resolveDefaultCurrency(settings);
-  if (raw === "ARS" && (settings.treatArsAsUyu ?? true)) {
-    return "UYU";
-  }
-  return raw;
+  const fallback = resolveDefaultCurrency(settings);
+  return normalizeStoredCurrency(t.currency as string | undefined, fallback);
 }
 
 export function formatMoney(

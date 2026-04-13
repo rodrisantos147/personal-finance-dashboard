@@ -5,7 +5,11 @@ import { CsvImport } from "@/components/CsvImport";
 import { PdfImport } from "@/components/PdfImport";
 import { april2026Card8002Movements } from "@/lib/card-import-april-2026-8002";
 import { buildDemoExportJson } from "@/lib/demo-data";
-import { formatMoneyWithSettings, resolveDefaultCurrency } from "@/lib/format";
+import {
+  formatMoneyWithSettings,
+  normalizeStoredCurrency,
+  resolveDefaultCurrency,
+} from "@/lib/format";
 import { useFinanceStore } from "@/lib/store";
 import type { CurrencyCode } from "@/lib/types";
 
@@ -157,26 +161,6 @@ export function DataBackup() {
             <option value="USD">USD — dólares estadounidenses</option>
           </select>
         </label>
-        <label className="mt-4 flex cursor-pointer items-start gap-3 text-sm text-zinc-300">
-          <input
-            type="checkbox"
-            className="mt-1 rounded border-zinc-600"
-            checked={settings.treatArsAsUyu ?? true}
-            onChange={(e) =>
-              setSettings({ treatArsAsUyu: e.target.checked })
-            }
-          />
-          <span>
-            <span className="font-medium text-zinc-200">
-              Tratar movimientos en ARS como pesos uruguayos (UYU)
-            </span>
-            <span className="mt-1 block text-xs text-zinc-500">
-              Si tus gastos solo son en $U y USD pero aparecen en Consumos como
-              &quot;Otras monedas&quot;, suele ser que el import los guardó como ARS.
-              Desactivá esta opción solo si registrás pesos argentinos de verdad.
-            </span>
-          </span>
-        </label>
         <label className="mt-4 flex max-w-sm flex-col gap-1 text-sm">
           <span className="text-zinc-400">
             Tipo de cambio referencia (pesos por 1 USD)
@@ -254,7 +238,7 @@ export function DataBackup() {
               amount,
               dayOfMonth: day,
               active: true,
-              currency: cur === "USD" ? "USD" : "UYU",
+              currency: normalizeStoredCurrency(cur, "UYU"),
             });
             e.currentTarget.reset();
           }}
@@ -299,6 +283,7 @@ export function DataBackup() {
             >
               <option value="UYU">UYU</option>
               <option value="USD">USD</option>
+              <option value="EUR">EUR</option>
             </select>
           </label>
           <div className="flex items-end">

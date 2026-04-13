@@ -146,7 +146,7 @@ export function ExpensesConsumosPanel({
     }
     if (hasFx && totals.other > 0) {
       data.push({
-        name: "Otras monedas (ARS/EUR…)",
+        name: "Otras monedas (EUR…)",
         value: totals.other,
       });
     }
