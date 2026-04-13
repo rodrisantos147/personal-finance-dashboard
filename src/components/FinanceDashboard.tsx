@@ -4,7 +4,9 @@ import {
   addMonths,
   endOfMonth,
   format,
+  startOfDay,
   startOfMonth,
+  subDays,
   subMonths,
 } from "date-fns";
 import {
@@ -72,6 +74,16 @@ const REPORT_CURRENCIES: { id: CurrencyCode; label: string }[] = [
   { id: "EUR", label: "Euros (EUR)" },
 ];
 
+type RangeMode = "month" | "custom" | "rolling";
+type RollingPreset = 30 | 60 | 90 | 365;
+
+const ROLLING_PRESETS: { days: RollingPreset; label: string }[] = [
+  { days: 30, label: "30 días" },
+  { days: 60, label: "60 días" },
+  { days: 90, label: "90 días" },
+  { days: 365, label: "1 año" },
+];
+
 export function FinanceDashboard() {
   const settings = useFinanceStore((s) => s.settings);
   const transactions = useFinanceStore((s) => s.transactions);
@@ -82,7 +94,8 @@ export function FinanceDashboard() {
     resolveDefaultCurrency(settings),
   );
   const [periodMonth, setPeriodMonth] = useState(() => startOfMonth(new Date()));
-  const [rangeMode, setRangeMode] = useState<"month" | "custom">("month");
+  const [rangeMode, setRangeMode] = useState<RangeMode>("month");
+  const [rollingDays, setRollingDays] = useState<RollingPreset>(30);
   const [customFrom, setCustomFrom] = useState(
     () => format(startOfMonth(new Date()), "yyyy-MM-dd"),
   );
@@ -94,11 +107,18 @@ export function FinanceDashboard() {
     if (rangeMode === "month") {
       return { from: periodMonth, to: endOfMonth(periodMonth) };
     }
+    if (rangeMode === "rolling") {
+      const end = new Date();
+      return {
+        from: startOfDay(subDays(end, rollingDays - 1)),
+        to: end,
+      };
+    }
     return {
       from: new Date(customFrom),
       to: endOfMonth(new Date(customTo)),
     };
-  }, [rangeMode, periodMonth, customFrom, customTo]);
+  }, [rangeMode, periodMonth, customFrom, customTo, rollingDays]);
 
   const slice = useMemo(
     () => filterByDateRange(transactions, from, to),
@@ -350,7 +370,7 @@ export function FinanceDashboard() {
       <section className="flex flex-col gap-3 rounded-xl border border-zinc-800 bg-zinc-900/50 p-4">
         <div className="flex flex-wrap items-center gap-2">
           <span className="text-xs font-medium text-zinc-500">Período</span>
-          <div className="flex rounded-lg border border-zinc-700 bg-zinc-900 p-0.5">
+          <div className="flex flex-wrap rounded-lg border border-zinc-700 bg-zinc-900 p-0.5">
             <button
               type="button"
               onClick={() => setRangeMode("month")}
@@ -362,6 +382,18 @@ export function FinanceDashboard() {
               )}
             >
               Mes
+            </button>
+            <button
+              type="button"
+              onClick={() => setRangeMode("rolling")}
+              className={cn(
+                "rounded-md px-3 py-1.5 text-xs font-medium transition",
+                rangeMode === "rolling"
+                  ? "bg-white text-zinc-950"
+                  : "text-zinc-400 hover:text-white",
+              )}
+            >
+              Últimos días
             </button>
             <button
               type="button"
@@ -418,6 +450,36 @@ export function FinanceDashboard() {
                 movimientos en Movimientos / Datos.
               </p>
             )}
+          </div>
+        ) : rangeMode === "rolling" ? (
+          <div className="flex flex-col gap-3">
+            <div className="flex flex-wrap gap-2">
+              {ROLLING_PRESETS.map(({ days, label }) => (
+                <button
+                  key={days}
+                  type="button"
+                  onClick={() => setRollingDays(days)}
+                  className={cn(
+                    "rounded-lg border px-3 py-2 text-sm font-medium transition",
+                    rollingDays === days
+                      ? "border-white bg-white text-zinc-950"
+                      : "border-zinc-700 text-zinc-300 hover:border-zinc-500 hover:text-white",
+                  )}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+            <span className="text-xs text-zinc-500">
+              {format(from, "d MMM yyyy")} — {format(to, "d MMM yyyy")} ·{" "}
+              <strong className="text-zinc-400">{rollingDays}</strong> días
+              corridos hasta hoy
+            </span>
+            <p className="text-xs leading-relaxed text-zinc-500">
+              Incluye el día de hoy. La comparación &quot;vs período
+              anterior&quot; en los KPI usa el mismo número de días inmediatamente
+              antes de este.
+            </p>
           </div>
         ) : (
           <div className="flex flex-wrap items-center gap-3">
@@ -602,7 +664,13 @@ export function FinanceDashboard() {
             <Kpi
               label="Resultado (ingresos − gastos)"
               value={fmt(net)}
-              hint="Solo movimientos con fecha dentro del período de arriba (mes completo o rango)"
+              hint={
+                rangeMode === "month"
+                  ? "Solo movimientos en el mes calendario seleccionado."
+                  : rangeMode === "rolling"
+                    ? `Solo movimientos entre las fechas del bloque «Últimos días» (${rollingDays} días hasta hoy).`
+                    : "Solo movimientos entre las fechas del rango personalizado."
+              }
               positive={net >= 0}
             />
             <Kpi
@@ -703,8 +771,13 @@ export function FinanceDashboard() {
               {chartAnchor.toLocaleDateString("es-UY", {
                 month: "long",
                 year: "numeric",
-              })}{" "}
-              (mismo criterio que el período si elegiste un mes completo).
+              })}
+              .{" "}
+              {rangeMode === "month"
+                ? "Coincide con el mes elegido en «Mes»."
+                : rangeMode === "rolling"
+                  ? "El gráfico sigue siendo por mes calendario (6 meses); el resumen de KPI usa solo los últimos días elegidos arriba."
+                  : "Con «Rango» personalizado, el gráfico sigue mostrando meses completos hasta el fin del mes de «Hasta»."}
             </p>
             {barChartScaleNote && (
               <p className="mb-3 rounded-lg border border-amber-900/40 bg-amber-950/20 px-3 py-2 text-xs text-amber-100/90">
