@@ -62,7 +62,7 @@ export function CsvImport() {
     ) {
       return;
     }
-    importTransactions(
+    const { added, skippedDuplicates } = importTransactions(
       rows.map((r) => ({
         type: r.type,
         amount: r.amount,
@@ -78,7 +78,11 @@ export function CsvImport() {
       })),
     );
     setText("");
-    alert(`Importados ${rows.length} movimientos.`);
+    alert(
+      skippedDuplicates
+        ? `Importados ${added} movimientos. Omitidos ${skippedDuplicates} duplicados (ya estaban cargados).`
+        : `Importados ${added} movimientos.`,
+    );
   }
 
   return (

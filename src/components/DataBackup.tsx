@@ -15,6 +15,8 @@ export function DataBackup() {
   const exportData = useFinanceStore((s) => s.exportData);
   const importData = useFinanceStore((s) => s.importData);
   const importTransactions = useFinanceStore((s) => s.importTransactions);
+  const dedupeTransactions = useFinanceStore((s) => s.dedupeTransactions);
+  const transactionCount = useFinanceStore((s) => s.transactions.length);
   const loadDemoData = useFinanceStore((s) => s.loadDemoData);
   const resetAll = useFinanceStore((s) => s.resetAll);
   const addRecurringIncome = useFinanceStore((s) => s.addRecurringIncome);
@@ -90,8 +92,14 @@ export function DataBackup() {
                 `Agregar ${april2026Card8002Movements.length} movimientos de abril 2026 al historial actual?`,
               )
             ) {
-              importTransactions(april2026Card8002Movements);
-              alert("Movimientos agregados. Revisá Resumen o Movimientos.");
+              const { added, skippedDuplicates } = importTransactions(
+                april2026Card8002Movements,
+              );
+              alert(
+                skippedDuplicates
+                  ? `Agregados ${added}. ${skippedDuplicates} ya estaban (duplicados omitidos).`
+                  : `Agregados ${added} movimientos. Revisá Resumen o Movimientos.`,
+              );
             }
           }}
         >
@@ -102,6 +110,33 @@ export function DataBackup() {
       <CsvImport />
 
       <PdfImport />
+
+      <section className="rounded-xl border border-zinc-800 bg-zinc-900/40 p-6">
+        <h2 className="text-lg font-medium text-white">Duplicados en movimientos</h2>
+        <p className="mt-2 text-sm text-zinc-500">
+          Si importaste el mismo extracto dos veces, podés dejar una sola fila por
+          movimiento (misma fecha, monto, tipo, descripción, moneda, categoría y
+          medio). También se omiten duplicados al importar CSV/PDF y al cargar la
+          app.
+        </p>
+        <p className="mt-2 text-xs text-zinc-600">
+          Movimientos guardados: {transactionCount}
+        </p>
+        <button
+          type="button"
+          className="mt-4 rounded-lg border border-zinc-600 px-4 py-2.5 text-sm text-zinc-200 hover:bg-zinc-800"
+          onClick={() => {
+            const { removed } = dedupeTransactions();
+            alert(
+              removed
+                ? `Se eliminaron ${removed} movimientos duplicados.`
+                : "No había duplicados con la misma clave.",
+            );
+          }}
+        >
+          Quitar duplicados ahora
+        </button>
+      </section>
 
       <section className="rounded-xl border border-zinc-800 bg-zinc-900/40 p-6">
         <h2 className="text-lg font-medium text-white">Ajustes generales</h2>

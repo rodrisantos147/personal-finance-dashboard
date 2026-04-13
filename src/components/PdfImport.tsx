@@ -76,7 +76,7 @@ export function PdfImport() {
     ) {
       return;
     }
-    importTransactions(
+    const { added, skippedDuplicates } = importTransactions(
       parsed.rows.map((r) => ({
         type: r.type,
         amount: r.amount,
@@ -92,7 +92,11 @@ export function PdfImport() {
       })),
     );
     setRawText("");
-    alert(`Importados ${parsed.rows.length} movimientos.`);
+    alert(
+      skippedDuplicates
+        ? `Importados ${added} movimientos. Omitidos ${skippedDuplicates} duplicados.`
+        : `Importados ${added} movimientos.`,
+    );
   }
 
   return (

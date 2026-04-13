@@ -3,6 +3,11 @@
 import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
 import { buildDemoSnapshot } from "./demo-data";
+import { resolveDefaultCurrency } from "./format";
+import {
+  dedupeTransactionsByKey,
+  transactionDedupeKey,
+} from "./transaction-dedupe";
 import type {
   AppSettings,
   CreditCard,
@@ -40,8 +45,15 @@ interface FinanceState {
 
   setSettings: (s: Partial<AppSettings>) => void;
   addTransaction: (t: Omit<Transaction, "id">) => void;
-  /** Alta masiva (import CSV); preserva movimientos ya cargados. */
-  importTransactions: (items: Omit<Transaction, "id">[]) => void;
+  /**
+   * Alta masiva (import CSV / PDF). Omite filas ya iguales a las guardadas
+   * (misma fecha, monto, tipo, descripción, etc.).
+   */
+  importTransactions: (
+    items: Omit<Transaction, "id">[],
+  ) => { added: number; skippedDuplicates: number };
+  /** Elimina movimientos duplicados ya guardados (una pasada por clave). */
+  dedupeTransactions: () => { removed: number };
   updateTransaction: (id: string, t: Partial<Transaction>) => void;
   removeTransaction: (id: string) => void;
 
@@ -87,20 +99,52 @@ export const useFinanceStore = create<FinanceState>()(
         set((s) => ({ settings: { ...s.settings, ...partial } })),
 
       addTransaction: (t) =>
-        set((s) => ({
-          transactions: [
-            ...s.transactions,
-            { ...t, id: uid() },
-          ].sort((a, b) => b.date.localeCompare(a.date)),
-        })),
+        set((s) => {
+          const dc = resolveDefaultCurrency(s.settings);
+          const k = transactionDedupeKey(t, dc);
+          if (s.transactions.some((x) => transactionDedupeKey(x, dc) === k)) {
+            return s;
+          }
+          return {
+            transactions: [
+              ...s.transactions,
+              { ...t, id: uid() },
+            ].sort((a, b) => b.date.localeCompare(a.date)),
+          };
+        }),
 
-      importTransactions: (items) =>
-        set((s) => ({
-          transactions: [
-            ...items.map((t) => ({ ...t, id: uid() })),
-            ...s.transactions,
-          ].sort((a, b) => b.date.localeCompare(a.date)),
-        })),
+      importTransactions: (items) => {
+        const s = get();
+        const dc = resolveDefaultCurrency(s.settings);
+        const keys = new Set(
+          s.transactions.map((x) => transactionDedupeKey(x, dc)),
+        );
+        const fresh: Transaction[] = [];
+        let skippedDuplicates = 0;
+        for (const t of items) {
+          const k = transactionDedupeKey(t, dc);
+          if (keys.has(k)) {
+            skippedDuplicates++;
+            continue;
+          }
+          keys.add(k);
+          fresh.push({ ...t, id: uid() });
+        }
+        set({
+          transactions: [...fresh, ...s.transactions].sort((a, b) =>
+            b.date.localeCompare(a.date),
+          ),
+        });
+        return { added: fresh.length, skippedDuplicates };
+      },
+
+      dedupeTransactions: () => {
+        const s = get();
+        const before = s.transactions.length;
+        const next = dedupeTransactionsByKey(s.transactions, s.settings);
+        set({ transactions: next });
+        return { removed: before - next.length };
+      },
 
       updateTransaction: (id, partial) =>
         set((s) => ({
@@ -220,12 +264,13 @@ export const useFinanceStore = create<FinanceState>()(
           locale: rawSettings?.locale ?? defaultState.settings.locale,
         };
         const dc = mergedSettings.defaultCurrency;
+        const rawTx = (data.transactions ?? []).map((t) => ({
+          ...t,
+          currency: t.currency ?? dc,
+        }));
         set({
           settings: mergedSettings,
-          transactions: (data.transactions ?? []).map((t) => ({
-            ...t,
-            currency: t.currency ?? dc,
-          })),
+          transactions: dedupeTransactionsByKey(rawTx, mergedSettings),
           creditCards: data.creditCards ?? [],
           wishlist: (data.wishlist ?? []).map((w) => ({
             ...w,
@@ -249,6 +294,27 @@ export const useFinanceStore = create<FinanceState>()(
     {
       name: "personal-finance-dashboard",
       storage: createJSONStorage(() => localStorage),
+      merge: (persisted, current) => {
+        const p = (persisted ?? {}) as Partial<FinanceState>;
+        const c = current as FinanceState;
+        const merged = { ...c, ...p };
+        merged.settings = {
+          ...defaultState.settings,
+          ...c.settings,
+          ...p.settings,
+          defaultCurrency:
+            p.settings?.defaultCurrency ??
+            c.settings?.defaultCurrency ??
+            defaultState.settings.defaultCurrency,
+          locale: p.settings?.locale ?? c.settings.locale,
+        };
+        const txs = merged.transactions ?? [];
+        merged.transactions =
+          txs.length > 0
+            ? dedupeTransactionsByKey(txs, merged.settings)
+            : txs;
+        return merged;
+      },
       partialize: (s) => ({
         settings: s.settings,
         transactions: s.transactions,
