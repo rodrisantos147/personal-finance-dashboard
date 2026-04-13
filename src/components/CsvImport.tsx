@@ -1,14 +1,14 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import { formatMoney } from "@/lib/format";
+import { useEffect, useMemo, useState } from "react";
+import { formatMoneyWithSettings, resolveDefaultCurrency } from "@/lib/format";
 import {
   parseBankCsv,
   type CsvImportPreviewRow,
   type SingleAmountConvention,
 } from "@/lib/csv-import";
 import { useFinanceStore } from "@/lib/store";
-import type { PaymentMethod } from "@/lib/types";
+import type { CurrencyCode, PaymentMethod } from "@/lib/types";
 
 const METHODS: { id: PaymentMethod; label: string }[] = [
   { id: "debit", label: "Débito" },
@@ -29,18 +29,27 @@ export function CsvImport() {
   const [catIncome, setCatIncome] = useState("Ingreso");
   const [payExpense, setPayExpense] = useState<PaymentMethod>("debit");
   const [payIncome, setPayIncome] = useState<PaymentMethod>("transfer");
+  const [importCurrency, setImportCurrency] = useState<CurrencyCode>(() =>
+    resolveDefaultCurrency(settings),
+  );
+
+  useEffect(() => {
+    setImportCurrency(resolveDefaultCurrency(settings));
+  }, [settings.defaultCurrency, settings.currency]);
 
   const parsed = useMemo(() => {
     if (!text.trim()) return null;
-    return parseBankCsv(text, convention);
-  }, [text, convention]);
+    return parseBankCsv(text, convention, importCurrency);
+  }, [text, convention, importCurrency]);
 
   const previewRows = useMemo(() => {
     if (!parsed || !parsed.ok) return [];
     return parsed.rows;
   }, [parsed]);
 
-  const fmt = (n: number) => formatMoney(n, settings);
+  function fmtPreview(n: number, c: CurrencyCode) {
+    return formatMoneyWithSettings(n, settings, c);
+  }
 
   function applyImport() {
     if (!parsed || !parsed.ok) return;
@@ -56,6 +65,7 @@ export function CsvImport() {
       rows.map((r) => ({
         type: r.type,
         amount: r.amount,
+        currency: r.currency ?? importCurrency,
         category: r.type === "expense" ? catExpense : catIncome,
         date: r.date,
         paymentMethod: r.type === "expense" ? payExpense : payIncome,
@@ -122,7 +132,18 @@ export function CsvImport() {
         />
       </label>
 
-      <div className="mt-4 grid gap-4 sm:grid-cols-2">
+      <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <label className="flex flex-col gap-1 text-sm">
+          <span className="text-zinc-400">Moneda por defecto (si el CSV no la indica)</span>
+          <select
+            value={importCurrency}
+            onChange={(e) => setImportCurrency(e.target.value as CurrencyCode)}
+            className="rounded-lg border border-zinc-700 bg-zinc-950 px-3 py-2 text-white"
+          >
+            <option value="UYU">UYU ($)</option>
+            <option value="USD">USD (US$)</option>
+          </select>
+        </label>
         <label className="flex flex-col gap-1 text-sm">
           <span className="text-zinc-400">
             Si hay una sola columna de monto (sin Débito/Crédito)
@@ -229,6 +250,7 @@ export function CsvImport() {
                   <th className="px-2 py-2">Fecha</th>
                   <th className="px-2 py-2">Tipo</th>
                   <th className="px-2 py-2">Descripción</th>
+                  <th className="px-2 py-2">Mon.</th>
                   <th className="px-2 py-2 text-right">Monto</th>
                 </tr>
               </thead>
@@ -248,8 +270,11 @@ export function CsvImport() {
                     <td className="max-w-[200px] truncate px-2 py-1.5 text-zinc-300">
                       {r.description}
                     </td>
+                    <td className="px-2 py-1.5 text-zinc-500">
+                      {r.currency ?? importCurrency}
+                    </td>
                     <td className="px-2 py-1.5 text-right tabular-nums text-zinc-200">
-                      {fmt(r.amount)}
+                      {fmtPreview(r.amount, r.currency ?? importCurrency)}
                     </td>
                   </tr>
                 ))}

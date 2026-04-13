@@ -1,5 +1,6 @@
+import { formatMoney } from "./format";
 import { daysUntil, nextClosingDate, nextDueDate } from "./finance";
-import type { CreditCard } from "./types";
+import type { CreditCard, CurrencyCode } from "./types";
 
 export function buildTips(input: {
   periodIncome: number;
@@ -8,6 +9,8 @@ export function buildTips(input: {
   pendingIncome: number;
   pendingExpense: number;
   futureIncomeEstimate: number;
+  futureIncomeCurrency: CurrencyCode;
+  locale: string;
   cards: CreditCard[];
 }): string[] {
   const tips: string[] = [];
@@ -32,7 +35,7 @@ export function buildTips(input: {
 
   if (input.futureIncomeEstimate > 0) {
     tips.push(
-      `Ingresos futuros estimados en el horizonte: ${input.futureIncomeEstimate.toLocaleString("es-AR", { style: "currency", currency: "ARS" })}. Usalos solo como referencia hasta que entren.`,
+      `Ingresos futuros estimados (${input.futureIncomeCurrency}) en el horizonte: ${formatMoney(input.futureIncomeEstimate, input.futureIncomeCurrency, input.locale)}. Usalos solo como referencia hasta que entren.`,
     );
   }
 

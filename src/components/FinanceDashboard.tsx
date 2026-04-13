@@ -16,43 +16,56 @@ import {
   Settings2,
   Table2,
 } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import {
   Bar,
   BarChart,
   CartesianGrid,
-  Cell,
   Legend,
-  Pie,
-  PieChart,
   ResponsiveContainer,
   Tooltip,
   XAxis,
   YAxis,
 } from "recharts";
 import {
+  combinedExpenseByPaymentReferenceUyu,
+  combinedPeriodTotalsReferenceUyu,
   compareToPreviousPeriod,
+  currenciesInUse,
   debitVsCredit,
   estimateFutureIncome,
-  expensesByCategory,
   filterByDateRange,
   monthlyBuckets,
   pendingTotals,
   sumExpense,
   sumIncome,
 } from "@/lib/finance";
-import { formatMoney } from "@/lib/format";
+import { formatMoneyWithSettings, resolveDefaultCurrency } from "@/lib/format";
+import type { CurrencyCode } from "@/lib/types";
 import { buildTips } from "@/lib/tips";
 import { useFinanceStore } from "@/lib/store";
 import { cn } from "@/lib/cn";
 import { CreditCardsManager } from "./CreditCardsManager";
 import { DataBackup } from "./DataBackup";
+import { ExpensesConsumosPanel } from "./ExpensesConsumosPanel";
+import { FinancialStateCard } from "./FinancialStateCard";
 import { MovementsTable } from "./MovementsTable";
 import { WishlistManager } from "./WishlistManager";
+import { summarizeFinancialState } from "@/lib/financial-state";
 
 type Tab = "overview" | "movements" | "cards" | "wishlist" | "tips" | "data";
 
-const PIE_COLORS = ["#fafafa", "#d4d4d8", "#a1a1aa", "#71717a", "#52525b", "#3f3f46"];
+/** Muestra variación % con un decimal y signo. */
+function fmtDeltaPct(n: number) {
+  if (n === 0) return "0%";
+  const sign = n > 0 ? "+" : "";
+  return `${sign}${n.toFixed(1)}%`;
+}
+
+const REPORT_CURRENCIES: { id: CurrencyCode; label: string }[] = [
+  { id: "UYU", label: "Pesos (UYU)" },
+  { id: "USD", label: "Dólares (USD)" },
+];
 
 export function FinanceDashboard() {
   const settings = useFinanceStore((s) => s.settings);
@@ -60,6 +73,9 @@ export function FinanceDashboard() {
   const creditCards = useFinanceStore((s) => s.creditCards);
   const recurringIncomes = useFinanceStore((s) => s.recurringIncomes);
   const [tab, setTab] = useState<Tab>("overview");
+  const [reportCurrency, setReportCurrency] = useState<CurrencyCode>(() =>
+    resolveDefaultCurrency(settings),
+  );
   const [periodMonth, setPeriodMonth] = useState(() => startOfMonth(new Date()));
   const [rangeMode, setRangeMode] = useState<"month" | "custom">("month");
   const [customFrom, setCustomFrom] = useState(
@@ -84,30 +100,98 @@ export function FinanceDashboard() {
     [transactions, from, to],
   );
 
-  const income = useMemo(() => sumIncome(slice), [slice]);
-  const expense = useMemo(() => sumExpense(slice), [slice]);
+  const usedCurrencies = useMemo(
+    () => currenciesInUse(transactions, settings),
+    [transactions, settings],
+  );
+
+  useEffect(() => {
+    if (!usedCurrencies.includes(reportCurrency)) {
+      setReportCurrency(usedCurrencies[0] ?? resolveDefaultCurrency(settings));
+    }
+  }, [usedCurrencies, reportCurrency, settings]);
+
+  const income = useMemo(
+    () => sumIncome(slice, settings, reportCurrency),
+    [slice, settings, reportCurrency],
+  );
+  const expense = useMemo(
+    () => sumExpense(slice, settings, reportCurrency),
+    [slice, settings, reportCurrency],
+  );
   const net = income - expense;
+
+  const referenceTotals = useMemo(() => {
+    const fx = settings.referenceUyuPerUsd;
+    if (fx == null || fx <= 0) return null;
+    return combinedPeriodTotalsReferenceUyu(slice, settings, fx);
+  }, [slice, settings]);
+
+  const referenceExpenseByPay = useMemo(() => {
+    const fx = settings.referenceUyuPerUsd;
+    if (fx == null || fx <= 0) return null;
+    return combinedExpenseByPaymentReferenceUyu(slice, settings, fx);
+  }, [slice, settings]);
+
   const { pendingIncome, pendingExpense } = useMemo(
-    () => pendingTotals(transactions),
-    [transactions],
+    () => pendingTotals(transactions, settings, reportCurrency),
+    [transactions, settings, reportCurrency],
   );
   const horizon = endOfMonth(new Date());
   const future = useMemo(
-    () => estimateFutureIncome(transactions, recurringIncomes, horizon),
-    [transactions, recurringIncomes, horizon],
+    () =>
+      estimateFutureIncome(
+        transactions,
+        recurringIncomes,
+        horizon,
+        settings,
+        reportCurrency,
+      ),
+    [transactions, recurringIncomes, horizon, settings, reportCurrency],
   );
 
-  const categoryData = useMemo(() => expensesByCategory(slice), [slice]);
-  const dv = useMemo(() => debitVsCredit(slice), [slice]);
+  const dv = useMemo(
+    () => debitVsCredit(slice, settings, reportCurrency),
+    [slice, settings, reportCurrency],
+  );
   const creditShare =
     expense > 0 ? dv.credit / expense : 0;
 
   const comparison = useMemo(
-    () => compareToPreviousPeriod(transactions, from, to),
-    [transactions, from, to],
+    () =>
+      compareToPreviousPeriod(transactions, from, to, settings, reportCurrency),
+    [transactions, from, to, settings, reportCurrency],
   );
 
-  const barData = useMemo(() => monthlyBuckets(transactions, 6), [transactions]);
+  const chartAnchor = useMemo(() => {
+    if (rangeMode === "month") return endOfMonth(periodMonth);
+    return endOfMonth(to);
+  }, [rangeMode, periodMonth, to]);
+
+  const barData = useMemo(
+    () =>
+      monthlyBuckets(
+        transactions,
+        6,
+        settings,
+        reportCurrency,
+        chartAnchor,
+      ),
+    [transactions, settings, reportCurrency, chartAnchor],
+  );
+
+  const barChartScaleNote = useMemo(() => {
+    if (barData.length < 2) return null;
+    const last = barData[barData.length - 1];
+    const prevSlices = barData.slice(0, -1);
+    const prevMax = Math.max(
+      0,
+      ...prevSlices.flatMap((b) => [b.income, b.expense]),
+    );
+    const lastTotal = last.income + last.expense;
+    if (prevMax <= 0 || lastTotal >= prevMax * 0.08) return null;
+    return true;
+  }, [barData]);
 
   const tips = useMemo(
     () =>
@@ -118,6 +202,8 @@ export function FinanceDashboard() {
         pendingIncome,
         pendingExpense,
         futureIncomeEstimate: future.total,
+        futureIncomeCurrency: reportCurrency,
+        locale: settings.locale,
         cards: creditCards,
       }),
     [
@@ -127,6 +213,8 @@ export function FinanceDashboard() {
       pendingIncome,
       pendingExpense,
       future.total,
+      reportCurrency,
+      settings.locale,
       creditCards,
     ],
   );
@@ -134,7 +222,58 @@ export function FinanceDashboard() {
   const projectedSurplus =
     income - expense + pendingIncome - pendingExpense + future.total;
 
-  const fmt = (n: number) => formatMoney(n, settings);
+  const fmt = (n: number) =>
+    formatMoneyWithSettings(n, settings, reportCurrency);
+
+  const fmtUyu = (n: number) => formatMoneyWithSettings(n, settings, "UYU");
+
+  const financialState = useMemo(
+    () =>
+      summarizeFinancialState({
+        net,
+        income,
+        expense,
+        projectedSurplus,
+        pendingIncome,
+        pendingExpense,
+        deltaIncomePct: comparison.deltaIncomePct,
+        deltaExpensePct: comparison.deltaExpensePct,
+        creditExpenseShare: creditShare,
+        referenceNetUyu: referenceTotals?.net ?? null,
+        hasReferenceFx: !!(
+          settings.referenceUyuPerUsd && settings.referenceUyuPerUsd > 0
+        ),
+        movementsInPeriod: slice.length,
+      }),
+    [
+      net,
+      income,
+      expense,
+      projectedSurplus,
+      pendingIncome,
+      pendingExpense,
+      comparison.deltaIncomePct,
+      comparison.deltaExpensePct,
+      creditShare,
+      referenceTotals?.net,
+      settings.referenceUyuPerUsd,
+      slice.length,
+    ],
+  );
+
+  const periodLabelForState = useMemo(
+    () =>
+      `${from.toLocaleDateString("es-UY", {
+        day: "numeric",
+        month: "short",
+        year: "numeric",
+      })} — ${to.toLocaleDateString("es-UY", {
+        day: "numeric",
+        month: "short",
+        year: "numeric",
+      })}`,
+    [from, to],
+  );
 
   return (
     <div className="mx-auto flex min-h-screen max-w-7xl flex-col gap-6 px-4 py-8 pb-24 sm:px-6">
@@ -287,17 +426,50 @@ export function FinanceDashboard() {
 
       {tab === "overview" && (
         <>
+          <FinancialStateCard
+            state={financialState}
+            periodLabel={periodLabelForState}
+          />
+
+          <div className="flex flex-wrap items-center gap-3 rounded-xl border border-zinc-800 bg-zinc-900/30 px-4 py-3">
+            <span className="text-xs font-medium text-zinc-500">
+              Moneda del resumen y gráficos
+            </span>
+            <select
+              value={reportCurrency}
+              onChange={(e) =>
+                setReportCurrency(e.target.value as CurrencyCode)
+              }
+              className="rounded-lg border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm text-white"
+            >
+              {REPORT_CURRENCIES.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.label}
+                </option>
+              ))}
+            </select>
+            <span className="text-xs text-zinc-600">
+              Con datos: {usedCurrencies.join(", ") || "—"}
+            </span>
+          </div>
+
           <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             <Kpi
               label="Ingresos del período"
               value={fmt(income)}
-              hint={`vs período anterior: ${comparison.deltaIncomePct >= 0 ? "+" : ""}${comparison.deltaIncomePct}%`}
+              hint={`vs período anterior: ${fmtDeltaPct(comparison.deltaIncomePct)}`}
               positive
             />
             <Kpi
               label="Gastos del período"
               value={fmt(expense)}
-              hint={`vs período anterior: ${comparison.deltaExpensePct >= 0 ? "+" : ""}${comparison.deltaExpensePct}%`}
+              hint={`vs período anterior: ${fmtDeltaPct(comparison.deltaExpensePct)}`}
+              detail={
+                <span className="text-zinc-400">
+                  Débito {fmt(dv.debit)} · Crédito {fmt(dv.credit)} · Efect./transf.{" "}
+                  {fmt(dv.other)}
+                </span>
+              }
             />
             <Kpi
               label="Resultado (ingresos − gastos)"
@@ -311,6 +483,51 @@ export function FinanceDashboard() {
               hint="Ingresos y egresos marcados como pendientes"
             />
           </section>
+
+          {referenceTotals && (
+            <div className="rounded-xl border border-dashed border-zinc-600/80 bg-zinc-950/50 px-4 py-3">
+              <p className="text-xs font-medium text-zinc-500">
+                Referencia combinada (todo en UYU; USD ×{" "}
+                {(settings.referenceUyuPerUsd ?? 0).toLocaleString("es-UY", {
+                  maximumFractionDigits: 2,
+                })}
+                )
+              </p>
+              <p className="mt-2 text-lg font-semibold text-zinc-100">
+                Resultado: {fmtUyu(referenceTotals.net)}
+              </p>
+              <p className="mt-1 text-xs text-zinc-500">
+                Ingresos {fmtUyu(referenceTotals.income)} · Gastos{" "}
+                {fmtUyu(referenceTotals.expense)}
+              </p>
+              {referenceExpenseByPay && (
+                <p className="mt-1 text-xs text-zinc-600">
+                  Gastos por medio (equiv. UYU): débito{" "}
+                  {fmtUyu(referenceExpenseByPay.debit)} · crédito{" "}
+                  {fmtUyu(referenceExpenseByPay.credit)} · efect./transf.{" "}
+                  {fmtUyu(referenceExpenseByPay.otherPay)} (suma ={" "}
+                  {fmtUyu(referenceExpenseByPay.total)})
+                </p>
+              )}
+            </div>
+          )}
+
+          {!referenceTotals &&
+            usedCurrencies.includes("UYU") &&
+            usedCurrencies.includes("USD") && (
+              <p className="text-xs text-zinc-600">
+                Tip: en{" "}
+                <button
+                  type="button"
+                  className="text-zinc-400 underline hover:text-white"
+                  onClick={() => setTab("data")}
+                >
+                  Datos
+                </button>{" "}
+                podés cargar un tipo de cambio referencia para ver un solo número
+                que suma pesos y dólares (orientativo).
+              </p>
+            )}
 
           <section className="grid gap-4 lg:grid-cols-2">
             <div className="rounded-xl border border-zinc-800 bg-zinc-900/40 p-4">
@@ -339,88 +556,69 @@ export function FinanceDashboard() {
             </div>
           </section>
 
-          <section className="grid gap-6 lg:grid-cols-2">
-            <div className="rounded-xl border border-zinc-800 bg-zinc-900/40 p-4">
-              <h2 className="mb-4 text-sm font-medium text-zinc-300">
-                Últimos 6 meses — ingresos vs gastos
-              </h2>
-              <div className="h-72 w-full">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={barData}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#27272a" />
-                    <XAxis dataKey="label" stroke="#71717a" fontSize={11} />
-                    <YAxis stroke="#71717a" fontSize={11} />
-                    <Tooltip
-                      formatter={(v) =>
-                        fmt(typeof v === "number" ? v : Number(v))
-                      }
-                      contentStyle={{
-                        background: "#18181b",
-                        border: "1px solid #27272a",
-                        borderRadius: 8,
-                      }}
-                    />
-                    <Legend />
-                    <Bar dataKey="income" name="Ingresos" fill="#fafafa" radius={[4, 4, 0, 0]} />
-                    <Bar dataKey="expense" name="Gastos" fill="#52525b" radius={[4, 4, 0, 0]} />
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-            </div>
-
-            <div className="rounded-xl border border-zinc-800 bg-zinc-900/40 p-4">
-              <h2 className="mb-4 text-sm font-medium text-zinc-300">
-                Gastos por categoría (período seleccionado)
-              </h2>
-              <div className="h-72 w-full">
-                {categoryData.length === 0 ? (
-                  <p className="text-sm text-zinc-500">
-                    No hay gastos en este período.
-                  </p>
-                ) : (
-                  <ResponsiveContainer width="100%" height="100%">
-                    <PieChart>
-                      <Pie
-                        data={categoryData}
-                        dataKey="value"
-                        nameKey="name"
-                        cx="50%"
-                        cy="50%"
-                        innerRadius={50}
-                        outerRadius={90}
-                        paddingAngle={2}
-                        label={false}
-                      >
-                        {categoryData.map((_, i) => (
-                          <Cell
-                            key={categoryData[i].name}
-                            fill={PIE_COLORS[i % PIE_COLORS.length]}
-                          />
-                        ))}
-                      </Pie>
-                      <Tooltip
-                        formatter={(v) =>
-                          fmt(typeof v === "number" ? v : Number(v))
-                        }
-                      />
-                    </PieChart>
-                  </ResponsiveContainer>
-                )}
-              </div>
+          <section className="rounded-xl border border-zinc-800 bg-zinc-900/40 p-4">
+            <h2 className="mb-4 text-sm font-medium text-zinc-300">
+              Últimos 6 meses — ingresos vs gastos
+            </h2>
+            <p className="mb-3 text-xs text-zinc-600">
+              Todos los montos en{" "}
+              <strong className="text-zinc-400">{reportCurrency}</strong>. La
+              última barra es el mes que termina en{" "}
+              {chartAnchor.toLocaleDateString("es-UY", {
+                month: "long",
+                year: "numeric",
+              })}{" "}
+              (mismo criterio que el período si elegiste un mes completo).
+            </p>
+            {barChartScaleNote && (
+              <p className="mb-3 rounded-lg border border-amber-900/40 bg-amber-950/20 px-3 py-2 text-xs text-amber-100/90">
+                Este mes los totales son mucho menores que en meses anteriores: en
+                el gráfico la última barra puede verse casi invisible frente a la
+                escala. No es un error de cálculo: solo cambió el volumen vs meses
+                pasados.
+              </p>
+            )}
+            <div className="h-72 w-full min-h-[288px] min-w-0">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={barData}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#27272a" />
+                  <XAxis dataKey="label" stroke="#71717a" fontSize={11} />
+                  <YAxis stroke="#71717a" fontSize={11} />
+                  <Tooltip
+                    formatter={(v) =>
+                      fmt(typeof v === "number" ? v : Number(v))
+                    }
+                    contentStyle={{
+                      background: "#18181b",
+                      border: "1px solid #27272a",
+                      borderRadius: 8,
+                    }}
+                  />
+                  <Legend />
+                  <Bar dataKey="income" name="Ingresos" fill="#fafafa" radius={[4, 4, 0, 0]} />
+                  <Bar dataKey="expense" name="Gastos" fill="#52525b" radius={[4, 4, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
             </div>
           </section>
 
+          <ExpensesConsumosPanel slice={slice} settings={settings} />
+
           <section className="rounded-xl border border-zinc-800 bg-zinc-900/40 p-4">
-            <h2 className="mb-4 text-sm font-medium text-zinc-300">
-              Gastos: débito vs crédito vs otros (período)
+            <h2 className="mb-2 text-sm font-medium text-zinc-300">
+              Gastos del período por medio de pago
             </h2>
+            <p className="mb-4 text-xs text-zinc-600">
+              Misma moneda del resumen que arriba. La suma de las tres cajas es el
+              total de gastos del período ({fmt(expense)}).
+            </p>
             <div className="grid gap-4 sm:grid-cols-3">
               <div>
-                <p className="text-xs text-zinc-500">Débito</p>
+                <p className="text-xs text-zinc-500">Tarjeta débito</p>
                 <p className="text-xl font-semibold">{fmt(dv.debit)}</p>
               </div>
               <div>
-                <p className="text-xs text-zinc-500">Crédito</p>
+                <p className="text-xs text-zinc-500">Tarjeta crédito</p>
                 <p className="text-xl font-semibold">{fmt(dv.credit)}</p>
               </div>
               <div>
@@ -437,7 +635,7 @@ export function FinanceDashboard() {
       {tab === "cards" && <CreditCardsManager />}
 
       {tab === "wishlist" && (
-        <WishlistManager projectedSurplus={projectedSurplus} />
+        <WishlistManager periodFrom={from} periodTo={to} />
       )}
 
       {tab === "tips" && (
@@ -481,11 +679,13 @@ function Kpi({
   label,
   value,
   hint,
+  detail,
   positive,
 }: {
   label: string;
   value: string;
   hint?: string;
+  detail?: ReactNode;
   positive?: boolean;
 }) {
   return (
@@ -503,6 +703,9 @@ function Kpi({
       >
         {value}
       </p>
+      {detail && (
+        <p className="mt-2 text-[11px] leading-relaxed text-zinc-500">{detail}</p>
+      )}
       {hint && <p className="mt-2 text-xs text-zinc-500">{hint}</p>}
     </div>
   );

@@ -12,6 +12,7 @@ import {
 import type {
   AppSettings,
   CreditCard,
+  CurrencyCode,
   PaymentMethod,
   RecurringIncome,
   Transaction,
@@ -41,6 +42,7 @@ type TxSeed = {
   cardId?: string;
   description: string;
   isPending: boolean;
+  currency?: CurrencyCode;
 };
 
 const CARD_VISA = "demo-card-visa";
@@ -178,6 +180,16 @@ export function buildDemoSnapshot(referenceDate: Date = new Date()): DemoSnapsho
         description: "Reintegro esperado",
         isPending: true,
       });
+      push(16, {
+        type: "expense",
+        amount: 42,
+        category: "Servicios",
+        paymentMethod: "credit",
+        cardId: CARD_MC,
+        description: "Suscripción USD (demo)",
+        isPending: false,
+        currency: "USD",
+      });
     }
   }
 
@@ -189,6 +201,7 @@ export function buildDemoSnapshot(referenceDate: Date = new Date()): DemoSnapsho
       id: `demo-tx-${String(i + 1).padStart(3, "0")}`,
       type: s.type,
       amount: s.amount,
+      currency: s.currency ?? "UYU",
       category: s.category,
       date: d.toISOString(),
       paymentMethod: s.paymentMethod,
@@ -220,6 +233,7 @@ export function buildDemoSnapshot(referenceDate: Date = new Date()): DemoSnapsho
       amount: 920_000,
       dayOfMonth: 5,
       active: true,
+      currency: "UYU",
     },
     {
       id: "demo-rec-extras",
@@ -227,6 +241,7 @@ export function buildDemoSnapshot(referenceDate: Date = new Date()): DemoSnapsho
       amount: 45_000,
       dayOfMonth: 15,
       active: true,
+      currency: "UYU",
     },
   ];
 
@@ -238,6 +253,7 @@ export function buildDemoSnapshot(referenceDate: Date = new Date()): DemoSnapsho
       priority: "high",
       notes: "Comparar en hot sale",
       createdAt: addDays(referenceDate, -12).toISOString(),
+      currency: "UYU",
     },
     {
       id: "demo-wish-2",
@@ -246,6 +262,7 @@ export function buildDemoSnapshot(referenceDate: Date = new Date()): DemoSnapsho
       priority: "medium",
       notes: "",
       createdAt: addDays(referenceDate, -40).toISOString(),
+      currency: "UYU",
     },
     {
       id: "demo-wish-3",
@@ -254,6 +271,7 @@ export function buildDemoSnapshot(referenceDate: Date = new Date()): DemoSnapsho
       priority: "low",
       notes: "Cuando baje el dólar",
       createdAt: addDays(referenceDate, -5).toISOString(),
+      currency: "USD",
     },
   ];
 
@@ -271,8 +289,8 @@ export function buildDemoSnapshot(referenceDate: Date = new Date()): DemoSnapsho
   ];
 
   const settings: AppSettings = {
-    currency: "ARS",
-    locale: "es-AR",
+    defaultCurrency: "UYU",
+    locale: "es-UY",
     initialBalance: 180_000,
   };
 

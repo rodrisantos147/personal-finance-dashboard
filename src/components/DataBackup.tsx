@@ -3,14 +3,18 @@
 import { useState } from "react";
 import { CsvImport } from "@/components/CsvImport";
 import { PdfImport } from "@/components/PdfImport";
+import { april2026Card8002Movements } from "@/lib/card-import-april-2026-8002";
 import { buildDemoExportJson } from "@/lib/demo-data";
+import { formatMoneyWithSettings, resolveDefaultCurrency } from "@/lib/format";
 import { useFinanceStore } from "@/lib/store";
+import type { CurrencyCode } from "@/lib/types";
 
 export function DataBackup() {
   const settings = useFinanceStore((s) => s.settings);
   const setSettings = useFinanceStore((s) => s.setSettings);
   const exportData = useFinanceStore((s) => s.exportData);
   const importData = useFinanceStore((s) => s.importData);
+  const importTransactions = useFinanceStore((s) => s.importTransactions);
   const loadDemoData = useFinanceStore((s) => s.loadDemoData);
   const resetAll = useFinanceStore((s) => s.resetAll);
   const addRecurringIncome = useFinanceStore((s) => s.addRecurringIncome);
@@ -68,15 +72,98 @@ export function DataBackup() {
         </div>
       </section>
 
+      <section className="rounded-xl border border-emerald-900/40 bg-emerald-950/20 p-6">
+        <h2 className="text-lg font-medium text-white">
+          Extracto TC ****8002 — abril 2026
+        </h2>
+        <p className="mt-2 text-sm text-zinc-400">
+          Carga los 15 movimientos del resumen que importaste (PedidosYa, Spotify, Claude,
+          UTE, SODIMAC, pago de tarjeta, cuotas, etc.). Se suman a lo que ya tengas en
+          este navegador; no borra datos.
+        </p>
+        <button
+          type="button"
+          className="mt-4 rounded-lg bg-emerald-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-emerald-500"
+          onClick={() => {
+            if (
+              confirm(
+                `Agregar ${april2026Card8002Movements.length} movimientos de abril 2026 al historial actual?`,
+              )
+            ) {
+              importTransactions(april2026Card8002Movements);
+              alert("Movimientos agregados. Revisá Resumen o Movimientos.");
+            }
+          }}
+        >
+          Agregar movimientos TC 8002 (abr 2026)
+        </button>
+      </section>
+
       <CsvImport />
 
       <PdfImport />
 
       <section className="rounded-xl border border-zinc-800 bg-zinc-900/40 p-6">
+        <h2 className="text-lg font-medium text-white">Ajustes generales</h2>
+        <p className="mt-2 text-sm text-zinc-500">
+          Moneda por defecto para movimientos nuevos, importaciones y la vista de
+          reportes cuando elegís una sola moneda.
+        </p>
+        <label className="mt-4 flex max-w-sm flex-col gap-1 text-sm">
+          <span className="text-zinc-400">Moneda por defecto</span>
+          <select
+            value={resolveDefaultCurrency(settings)}
+            onChange={(e) =>
+              setSettings({ defaultCurrency: e.target.value as CurrencyCode })
+            }
+            className="rounded-lg border border-zinc-700 bg-zinc-950 px-3 py-2 text-white"
+          >
+            <option value="UYU">UYU — pesos uruguayos</option>
+            <option value="USD">USD — dólares estadounidenses</option>
+          </select>
+        </label>
+        <label className="mt-4 flex max-w-sm flex-col gap-1 text-sm">
+          <span className="text-zinc-400">
+            Tipo de cambio referencia (pesos por 1 USD)
+          </span>
+          <input
+            type="number"
+            min={0}
+            step={0.01}
+            placeholder="Ej. 42"
+            value={
+              settings.referenceUyuPerUsd != null &&
+              settings.referenceUyuPerUsd > 0
+                ? settings.referenceUyuPerUsd
+                : ""
+            }
+            onChange={(e) => {
+              const v = e.target.value;
+              if (v === "" || v === "0") {
+                setSettings({ referenceUyuPerUsd: undefined });
+                return;
+              }
+              const n = Number(v);
+              setSettings({
+                referenceUyuPerUsd: Number.isFinite(n) && n > 0 ? n : undefined,
+              });
+            }}
+            className="rounded-lg border border-zinc-700 bg-zinc-950 px-3 py-2 text-white"
+          />
+          <span className="text-xs text-zinc-600">
+            Opcional. En el resumen aparece un bloque extra con ingresos, gastos y
+            resultado combinados en UYU (USD multiplicado por este valor). No cambia
+            los números por moneda ni las gráficas.
+          </span>
+        </label>
+      </section>
+
+      <section className="rounded-xl border border-zinc-800 bg-zinc-900/40 p-6">
         <h2 className="text-lg font-medium text-white">Saldo inicial</h2>
         <p className="mt-2 text-sm text-zinc-500">
           Opcional: usalo si querés proyectar acumulado desde antes del primer
-          registro (próxima versión puede usarlo en reportes).
+          registro (próxima versión puede usarlo en reportes). El monto se interpreta
+          en la moneda por defecto.
         </p>
         <label className="mt-4 flex max-w-sm flex-col gap-1 text-sm">
           <span className="text-zinc-400">Monto</span>
@@ -98,13 +185,14 @@ export function DataBackup() {
           ingresos futuros del mes.
         </p>
         <form
-          className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-4"
+          className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-5"
           onSubmit={(e) => {
             e.preventDefault();
             const fd = new FormData(e.currentTarget);
             const label = String(fd.get("label") || "").trim();
             const amount = Number(fd.get("amount"));
             const day = Number(fd.get("day"));
+            const cur = String(fd.get("currency") || "UYU") as CurrencyCode;
             if (!label || !Number.isFinite(amount) || amount <= 0) return;
             if (!Number.isFinite(day) || day < 1 || day > 31) return;
             addRecurringIncome({
@@ -112,6 +200,7 @@ export function DataBackup() {
               amount,
               dayOfMonth: day,
               active: true,
+              currency: cur === "USD" ? "USD" : "UYU",
             });
             e.currentTarget.reset();
           }}
@@ -147,6 +236,17 @@ export function DataBackup() {
               className="rounded-lg border border-zinc-700 bg-zinc-950 px-3 py-2 text-white"
             />
           </label>
+          <label className="flex flex-col gap-1 text-sm">
+            <span className="text-zinc-400">Moneda</span>
+            <select
+              name="currency"
+              defaultValue={resolveDefaultCurrency(settings)}
+              className="rounded-lg border border-zinc-700 bg-zinc-950 px-3 py-2 text-white"
+            >
+              <option value="UYU">UYU</option>
+              <option value="USD">USD</option>
+            </select>
+          </label>
           <div className="flex items-end">
             <button
               type="submit"
@@ -165,10 +265,12 @@ export function DataBackup() {
               <span className="text-zinc-200">
                 {r.label}{" "}
                 <span className="text-zinc-500">
-                  — día {r.dayOfMonth} — {r.amount.toLocaleString("es-AR", {
-                    style: "currency",
-                    currency: settings.currency,
-                  })}
+                  — día {r.dayOfMonth} —{" "}
+                  {formatMoneyWithSettings(
+                    r.amount,
+                    settings,
+                    r.currency ?? resolveDefaultCurrency(settings),
+                  )}
                 </span>
               </span>
               <div className="flex gap-2">

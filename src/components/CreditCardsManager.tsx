@@ -4,7 +4,13 @@ import {
   fallbackDaysFromSchedule,
   ITAU_STYLE_2026_SCHEDULE,
 } from "@/lib/card-schedules";
-import { daysUntil, nextClosingDate, nextDueDate } from "@/lib/finance";
+import {
+  creditCardNetUsedUyuEquiv,
+  daysUntil,
+  nextClosingDate,
+  nextDueDate,
+} from "@/lib/finance";
+import { formatMoneyWithSettings, txCurrency } from "@/lib/format";
 import { useFinanceStore } from "@/lib/store";
 
 const MES_CORTO = [
@@ -24,12 +30,15 @@ const MES_CORTO = [
 ];
 
 export function CreditCardsManager() {
+  const settings = useFinanceStore((s) => s.settings);
+  const transactions = useFinanceStore((s) => s.transactions);
   const creditCards = useFinanceStore((s) => s.creditCards);
   const addCreditCard = useFinanceStore((s) => s.addCreditCard);
   const updateCreditCard = useFinanceStore((s) => s.updateCreditCard);
   const removeCreditCard = useFinanceStore((s) => s.removeCreditCard);
 
   const now = new Date();
+  const fmtUyu = (n: number) => formatMoneyWithSettings(n, settings, "UYU");
 
   return (
     <div className="space-y-6">
@@ -41,16 +50,29 @@ export function CreditCardsManager() {
           vencimiento.
         </p>
         <form
-          className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-4"
+          className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-5"
           onSubmit={(e) => {
             e.preventDefault();
             const fd = new FormData(e.currentTarget);
             const name = String(fd.get("name") || "").trim();
             const closing = Number(fd.get("closing"));
             const due = Number(fd.get("due"));
+            const limitRaw = String(fd.get("limitUyu") ?? "").trim();
+            const limitUyu =
+              limitRaw === ""
+                ? undefined
+                : Math.max(0, Number(limitRaw));
             if (!name || closing < 1 || closing > 31 || due < 1 || due > 31)
               return;
-            addCreditCard({ name, closingDay: closing, dueDay: due });
+            if (limitUyu !== undefined && !Number.isFinite(limitUyu)) return;
+            addCreditCard({
+              name,
+              closingDay: closing,
+              dueDay: due,
+              ...(limitUyu != null && limitUyu > 0
+                ? { creditLimitUyu: limitUyu }
+                : {}),
+            });
             e.currentTarget.reset();
           }}
         >
@@ -84,6 +106,20 @@ export function CreditCardsManager() {
               required
               className="rounded-lg border border-zinc-700 bg-zinc-950 px-3 py-2 text-white"
             />
+          </label>
+          <label className="flex flex-col gap-1 text-sm">
+            <span className="text-zinc-400">Límite de crédito (UYU)</span>
+            <input
+              name="limitUyu"
+              type="number"
+              min={0}
+              step={1}
+              placeholder="50000"
+              className="rounded-lg border border-zinc-700 bg-zinc-950 px-3 py-2 text-white"
+            />
+            <span className="text-[11px] text-zinc-600">
+              Opcional. Para ver % usado según movimientos con esta tarjeta.
+            </span>
           </label>
           <div className="flex items-end">
             <button
@@ -127,6 +163,15 @@ export function CreditCardsManager() {
         {creditCards.map((c) => {
           const close = nextClosingDate(c, now);
           const due = nextDueDate(c, now);
+          const used = creditCardNetUsedUyuEquiv(transactions, c.id, settings);
+          const limit = c.creditLimitUyu;
+          const pct =
+            limit != null && limit > 0
+              ? Math.min(100, Math.round((used / limit) * 100))
+              : null;
+          const linkedCount = transactions.filter((t) => t.cardId === c.id)
+            .length;
+
           return (
             <div
               key={c.id}
@@ -154,6 +199,56 @@ export function CreditCardsManager() {
                       Día fijo: cierre {c.closingDay}, vencimiento {c.dueDay}{" "}
                       de cada mes.
                     </p>
+                  )}
+                  {limit != null && limit > 0 && (
+                    <div className="mt-3 rounded-lg border border-zinc-700/80 bg-zinc-950/50 px-3 py-2 text-sm">
+                      <p className="text-zinc-400">
+                        Límite{" "}
+                        <span className="font-medium text-zinc-200">
+                          {fmtUyu(limit)}
+                        </span>
+                        {" · "}Usado{" "}
+                        <span
+                          className={
+                            used > limit
+                              ? "font-medium text-rose-400"
+                              : "font-medium text-zinc-200"
+                          }
+                        >
+                          {fmtUyu(used)}
+                        </span>
+                        {pct != null && (
+                          <>
+                            {" "}
+                            ({pct}% del límite)
+                          </>
+                        )}
+                      </p>
+                      <p className="mt-1 text-xs text-zinc-500">
+                        Disponible aprox.: {fmtUyu(Math.max(0, limit - used))}
+                      </p>
+                      {linkedCount === 0 && (
+                        <p className="mt-1 text-xs text-amber-200/80">
+                          Ningún movimiento tiene esta tarjeta asignada: el uso
+                          figura en 0. Editá movimientos en Movimientos y elegí
+                          esta tarjeta.
+                        </p>
+                      )}
+                      {linkedCount > 0 &&
+                        settings.referenceUyuPerUsd == null &&
+                        transactions.some(
+                          (t) =>
+                            t.cardId === c.id &&
+                            t.type === "expense" &&
+                            txCurrency(t, settings) === "USD",
+                        ) && (
+                          <p className="mt-1 text-xs text-zinc-600">
+                            Tenés gastos en USD con esta tarjeta: cargá el tipo
+                            de cambio referencia en Datos para incluirlos en el
+                            uso en pesos.
+                          </p>
+                        )}
+                    </div>
                   )}
                 </div>
                 <div className="flex flex-wrap gap-2">
@@ -219,6 +314,31 @@ export function CreditCardsManager() {
                     }}
                   >
                     Editar nombre / días base
+                  </button>
+                  <button
+                    type="button"
+                    className="rounded-lg border border-zinc-600 px-3 py-1.5 text-xs text-zinc-300 hover:bg-zinc-800"
+                    onClick={() => {
+                      const raw = prompt(
+                        "Límite de crédito en pesos uruguayos (vacío para quitar)",
+                        c.creditLimitUyu != null && c.creditLimitUyu > 0
+                          ? String(c.creditLimitUyu)
+                          : "50000",
+                      );
+                      if (raw === null) return;
+                      const t = raw.trim();
+                      if (t === "") {
+                        updateCreditCard(c.id, { creditLimitUyu: undefined });
+                        return;
+                      }
+                      const n = Number(t);
+                      if (!Number.isFinite(n) || n < 0) return;
+                      updateCreditCard(c.id, {
+                        creditLimitUyu: n > 0 ? n : undefined,
+                      });
+                    }}
+                  >
+                    Límite (UYU)
                   </button>
                   <button
                     type="button"

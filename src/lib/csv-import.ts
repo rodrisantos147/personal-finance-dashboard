@@ -1,4 +1,4 @@
-import type { PaymentMethod, TransactionType } from "./types";
+import type { CurrencyCode, PaymentMethod, TransactionType } from "./types";
 
 export type SingleAmountConvention =
   | "signed"
@@ -12,6 +12,7 @@ export type CsvImportPreviewRow = {
   type: TransactionType;
   amount: number;
   raw?: string;
+  currency?: CurrencyCode;
 };
 
 export type CsvImportResult =
@@ -141,7 +142,31 @@ const ALIAS = {
   credito: ["credito", "haber", "abonos", "ingreso", "entrada"],
   monto: ["monto", "importe", "valor", "amount", "cantidad"],
   tipo: ["tipo", "tipomovimiento", "clase"],
+  moneda: ["moneda", "currency", "divisa"],
 };
+
+export function inferCurrencyFromMoneyStrings(
+  ...raws: string[]
+): CurrencyCode | undefined {
+  for (const raw of raws) {
+    const u = raw.toUpperCase();
+    if (/\b(US\$|U\$S|USD)\b/.test(u) || u.includes("US$")) return "USD";
+    if (/\bARS\b/.test(u)) return "ARS";
+    if (/\bEUR\b|€/.test(u)) return "EUR";
+  }
+  return undefined;
+}
+
+function parseCurrencyCell(raw: string): CurrencyCode | undefined {
+  const s = raw.trim().toUpperCase();
+  if (!s) return undefined;
+  if (s === "USD" || s === "US$" || s === "U$S" || s === "DOLAR" || s === "DOLARES")
+    return "USD";
+  if (s === "UYU" || s === "$U" || s === "PESOS" || s === "UY") return "UYU";
+  if (s === "ARS") return "ARS";
+  if (s === "EUR") return "EUR";
+  return undefined;
+}
 
 function findColumnIndex(
   headers: string[],
@@ -178,6 +203,7 @@ function inferTipo(
 export function parseBankCsv(
   text: string,
   singleAmountConvention: SingleAmountConvention,
+  defaultCurrency: CurrencyCode = "UYU",
 ): CsvImportResult {
   const rows = parseCsvRows(text);
   if (rows.length < 2) {
@@ -193,6 +219,7 @@ export function parseBankCsv(
   const iCred = findColumnIndex(headers, ALIAS.credito);
   let iMonto = findColumnIndex(headers, ALIAS.monto);
   const iTipo = findColumnIndex(headers, ALIAS.tipo);
+  const iMoneda = findColumnIndex(headers, ALIAS.moneda);
 
   if (iFecha === undefined) {
     return {
@@ -296,12 +323,31 @@ export function parseBankCsv(
       continue;
     }
 
+    let rowCurrency: CurrencyCode = defaultCurrency;
+    const fromCol =
+      iMoneda !== undefined
+        ? parseCurrencyCell(String(cells[iMoneda] ?? ""))
+        : undefined;
+    if (fromCol) {
+      rowCurrency = fromCol;
+    } else if (mode === "deb_cred" && iDeb !== undefined && iCred !== undefined) {
+      const rawD = String(cells[iDeb] ?? "").trim();
+      const rawC = String(cells[iCred] ?? "").trim();
+      const hint = inferCurrencyFromMoneyStrings(rawD, rawC);
+      if (hint) rowCurrency = hint;
+    } else if (iMonto !== undefined) {
+      const rawM = String(cells[iMonto] ?? "").trim();
+      const hint = inferCurrencyFromMoneyStrings(rawM);
+      if (hint) rowCurrency = hint;
+    }
+
     out.push({
       line,
       date: d.toISOString(),
       description,
       type,
       amount,
+      currency: rowCurrency,
     });
   }
 

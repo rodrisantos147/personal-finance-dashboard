@@ -4,6 +4,8 @@ Next.js (App Router) + Tailwind + Recharts. Tema oscuro con acentos blancos. Los
 
 ## Funciones
 
+- **Pesos uruguayos (UYU) y dólares (USD)** por movimiento; moneda por defecto en **Datos** → Ajustes generales; el dashboard permite elegir en qué moneda ver KPIs y gráficos
+- **Total de referencia en UYU** (opcional): en Datos podés cargar un tipo de cambio “pesos por 1 USD” para ver un bloque extra en el resumen que combina ambas monedas sin afectar los gráficos
 - Ingresos y egresos con categoría, débito/crédito/efectivo/transferencia, pendientes
 - Tarjetas con día de cierre y vencimiento (recordatorios en Consejos); opcional **calendario mensual** (ej. tabla 2026 tipo Itaú)
 - Ingresos recurrentes para estimar ingresos futuros del mes
@@ -27,7 +29,7 @@ Código: `src/lib/demo-data.ts` (`buildDemoSnapshot`, `buildDemoExportJson`).
 
 ### Estados de cuenta en CSV
 
-En **Datos** → **Importar desde CSV**: subí el archivo o pegá el texto. Se detectan columnas típicas (**Fecha**, **Descripción**, **Débito** / **Crédito**, o **Monto**). Podés mezclar varios meses en un solo archivo. Si el banco exporta una sola columna de importe, usá signo (negativo = egreso) o indicá que todo es egreso/ingreso. La categoría y el medio de pago por defecto se aplican a todo el lote (después podés editar o borrar filas en Movimientos).
+En **Datos** → **Importar desde CSV**: subí el archivo o pegá el texto. Se detectan columnas típicas (**Fecha**, **Descripción**, **Débito** / **Crédito**, o **Monto**; opcional **Moneda**). Podés elegir la moneda por defecto del lote si el archivo no la trae; también se intenta detectar **US$** en los importes. Podés mezclar varios meses en un solo archivo. Si el banco exporta una sola columna de importe, usá signo (negativo = egreso) o indicá que todo es egreso/ingreso. La categoría y el medio de pago por defecto se aplican a todo el lote (después podés editar o borrar filas en Movimientos).
 
 ### PDF (Itaú y similares)
 

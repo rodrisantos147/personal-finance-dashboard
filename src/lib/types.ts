@@ -2,10 +2,15 @@ export type PaymentMethod = "debit" | "credit" | "cash" | "transfer";
 
 export type TransactionType = "income" | "expense";
 
+/** ISO 4217 — UYU pesos uruguayos, USD dólares US. */
+export type CurrencyCode = "UYU" | "USD" | "ARS" | "EUR";
+
 export interface Transaction {
   id: string;
   type: TransactionType;
   amount: number;
+  /** Moneda del importe (pesos vs dólares, etc.). Si falta, usa el default de ajustes. */
+  currency?: CurrencyCode;
   category: string;
   date: string;
   paymentMethod: PaymentMethod;
@@ -31,6 +36,8 @@ export interface CreditCard {
   closingDay: number;
   /** Día de vencimiento de pago (1–31) */
   dueDay: number;
+  /** Límite de compras en pesos uruguayos (opcional; para ver % usado). */
+  creditLimitUyu?: number;
   /** Opcional: cierre/vencimiento por mes (ej. tabla anual del home banking). */
   annualSchedule?: CreditCardMonthEntry[];
 }
@@ -44,6 +51,7 @@ export interface WishlistItem {
   priority: WishlistPriority;
   notes: string;
   createdAt: string;
+  currency?: CurrencyCode;
 }
 
 export interface RecurringIncome {
@@ -52,11 +60,20 @@ export interface RecurringIncome {
   amount: number;
   dayOfMonth: number;
   active: boolean;
+  currency?: CurrencyCode;
 }
 
 export interface AppSettings {
-  currency: string;
+  /** Moneda por defecto al cargar movimientos nuevos e importaciones. */
+  defaultCurrency: CurrencyCode;
   locale: string;
   /** Saldo inicial antes del primer movimiento registrado */
   initialBalance: number;
+  /**
+   * Pesos uruguayos por 1 USD — solo para el total de referencia que combina monedas.
+   * No afecta los totales por moneda ni los gráficos.
+   */
+  referenceUyuPerUsd?: number;
+  /** @deprecated usar defaultCurrency */
+  currency?: string;
 }

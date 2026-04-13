@@ -6,6 +6,7 @@ import { buildDemoSnapshot } from "./demo-data";
 import type {
   AppSettings,
   CreditCard,
+  CurrencyCode,
   RecurringIncome,
   Transaction,
   WishlistItem,
@@ -66,8 +67,8 @@ interface FinanceState {
 
 const defaultState = {
   settings: {
-    currency: "ARS",
-    locale: "es-AR",
+    defaultCurrency: "UYU",
+    locale: "es-UY",
     initialBalance: 0,
   } satisfies AppSettings,
   transactions: [] as Transaction[],
@@ -206,12 +207,34 @@ export const useFinanceStore = create<FinanceState>()(
         const data = JSON.parse(json) as Partial<typeof defaultState> & {
           version?: number;
         };
+        const rawSettings = data.settings as
+          | (Partial<AppSettings> & { currency?: string })
+          | undefined;
+        const mergedSettings: AppSettings = {
+          ...defaultState.settings,
+          ...rawSettings,
+          defaultCurrency:
+            rawSettings?.defaultCurrency ??
+            (rawSettings?.currency as CurrencyCode | undefined) ??
+            "UYU",
+          locale: rawSettings?.locale ?? defaultState.settings.locale,
+        };
+        const dc = mergedSettings.defaultCurrency;
         set({
-          settings: { ...defaultState.settings, ...data.settings },
-          transactions: data.transactions ?? [],
+          settings: mergedSettings,
+          transactions: (data.transactions ?? []).map((t) => ({
+            ...t,
+            currency: t.currency ?? dc,
+          })),
           creditCards: data.creditCards ?? [],
-          wishlist: data.wishlist ?? [],
-          recurringIncomes: data.recurringIncomes ?? [],
+          wishlist: (data.wishlist ?? []).map((w) => ({
+            ...w,
+            currency: w.currency ?? dc,
+          })),
+          recurringIncomes: (data.recurringIncomes ?? []).map((r) => ({
+            ...r,
+            currency: r.currency ?? dc,
+          })),
           expenseCategories:
             data.expenseCategories?.length ? data.expenseCategories : DEFAULT_CATEGORIES,
         });

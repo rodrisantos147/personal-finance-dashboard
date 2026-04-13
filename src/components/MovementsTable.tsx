@@ -1,10 +1,10 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { filterByDateRange } from "@/lib/finance";
-import { formatMoney } from "@/lib/format";
+import { formatMoneyWithSettings, resolveDefaultCurrency, txCurrency } from "@/lib/format";
 import { useFinanceStore } from "@/lib/store";
-import type { PaymentMethod, TransactionType } from "@/lib/types";
+import type { CurrencyCode, PaymentMethod, TransactionType } from "@/lib/types";
 import { cn } from "@/lib/cn";
 
 const METHODS: { id: PaymentMethod; label: string }[] = [
@@ -12,6 +12,11 @@ const METHODS: { id: PaymentMethod; label: string }[] = [
   { id: "credit", label: "Crédito" },
   { id: "cash", label: "Efectivo" },
   { id: "transfer", label: "Transferencia" },
+];
+
+const CURS: { id: CurrencyCode; label: string }[] = [
+  { id: "UYU", label: "UYU ($)" },
+  { id: "USD", label: "USD (US$)" },
 ];
 
 export function MovementsTable({
@@ -38,13 +43,22 @@ export function MovementsTable({
   const [description, setDescription] = useState("");
   const [isPending, setIsPending] = useState(false);
   const [newCat, setNewCat] = useState("");
+  const [txCur, setTxCur] = useState<CurrencyCode>(() =>
+    resolveDefaultCurrency(settings),
+  );
+
+  useEffect(() => {
+    setTxCur(resolveDefaultCurrency(settings));
+  }, [settings.defaultCurrency, settings.currency]);
 
   const slice = useMemo(
     () => filterByDateRange(transactions, periodFrom, periodTo),
     [transactions, periodFrom, periodTo],
   );
 
-  const fmt = (n: number) => formatMoney(n, settings);
+  function fmtRow(n: number, c: CurrencyCode) {
+    return formatMoneyWithSettings(n, settings, c);
+  }
 
   function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -53,6 +67,7 @@ export function MovementsTable({
     addTransaction({
       type,
       amount: n,
+      currency: txCur,
       category: type === "expense" ? category : "Ingreso",
       date: new Date(date).toISOString(),
       paymentMethod: type === "expense" ? paymentMethod : "transfer",
@@ -93,6 +108,20 @@ export function MovementsTable({
               placeholder="0"
               className="rounded-lg border border-zinc-700 bg-zinc-950 px-3 py-2 text-white"
             />
+          </label>
+          <label className="flex flex-col gap-1 text-sm">
+            <span className="text-zinc-400">Moneda</span>
+            <select
+              value={txCur}
+              onChange={(e) => setTxCur(e.target.value as CurrencyCode)}
+              className="rounded-lg border border-zinc-700 bg-zinc-950 px-3 py-2 text-white"
+            >
+              {CURS.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.label}
+                </option>
+              ))}
+            </select>
           </label>
           <label className="flex flex-col gap-1 text-sm">
             <span className="text-zinc-400">Fecha</span>
@@ -223,6 +252,7 @@ export function MovementsTable({
                 <th className="px-4 py-3">Descripción</th>
                 <th className="px-4 py-3">Categoría</th>
                 <th className="px-4 py-3">Medio</th>
+                <th className="px-4 py-3">Mon.</th>
                 <th className="px-4 py-3 text-right">Monto</th>
                 <th className="px-4 py-3" />
               </tr>
@@ -230,7 +260,7 @@ export function MovementsTable({
             <tbody className="divide-y divide-zinc-800">
               {slice.length === 0 && (
                 <tr>
-                  <td colSpan={7} className="px-4 py-8 text-center text-zinc-500">
+                  <td colSpan={8} className="px-4 py-8 text-center text-zinc-500">
                     No hay movimientos en este período.
                   </td>
                 </tr>
@@ -264,6 +294,9 @@ export function MovementsTable({
                       ? METHODS.find((m) => m.id === t.paymentMethod)?.label
                       : "—"}
                   </td>
+                  <td className="px-4 py-3 text-xs text-zinc-500">
+                    {txCurrency(t, settings)}
+                  </td>
                   <td
                     className={cn(
                       "px-4 py-3 text-right font-medium tabular-nums",
@@ -271,7 +304,7 @@ export function MovementsTable({
                     )}
                   >
                     {t.type === "income" ? "+" : "−"}
-                    {fmt(t.amount)}
+                    {fmtRow(t.amount, txCurrency(t, settings))}
                   </td>
                   <td className="px-4 py-3 text-right">
                     <button

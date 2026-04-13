@@ -1,5 +1,10 @@
 import type { CsvImportResult, CsvImportPreviewRow } from "./csv-import";
-import { parseDateFlexible, parseMoneyAR } from "./csv-import";
+import {
+  inferCurrencyFromMoneyStrings,
+  parseDateFlexible,
+  parseMoneyAR,
+} from "./csv-import";
+import type { CurrencyCode } from "./types";
 import type { TransactionType } from "./types";
 
 const SKIP_LINE =
@@ -147,6 +152,7 @@ export function parseItauUruguayPdfText(text: string): {
       description: description.slice(0, 280),
       type,
       amount,
+      currency: "UYU",
       raw: `${line} | ${description} | ${amountStr}`,
     });
   }
@@ -186,12 +192,14 @@ function parseSingleLine(line: string, lineNo: number): CsvImportPreviewRow | nu
   if (!d || !Number.isFinite(signed) || signed === 0) return null;
 
   const type = signed < 0 ? "expense" : "income";
+  const cur: CurrencyCode = inferCurrencyFromMoneyStrings(t, amountRaw) ?? "UYU";
   return {
     line: lineNo,
     date: d.toISOString(),
     description: descPart.slice(0, 280) || "Movimiento",
     type,
     amount: Math.abs(signed),
+    currency: cur,
     raw: t,
   };
 }
@@ -226,6 +234,9 @@ function parseDebitCreditLine(line: string, lineNo: number): CsvImportPreviewRow
   const d = parseDateFlexible(datePart);
   if (!d) return null;
 
+  const cur: CurrencyCode =
+    inferCurrencyFromMoneyStrings(t, rawDeb, rawCred) ?? "UYU";
+
   if (absDeb > 0) {
     return {
       line: lineNo,
@@ -233,6 +244,7 @@ function parseDebitCreditLine(line: string, lineNo: number): CsvImportPreviewRow
       description: desc.slice(0, 280) || "Egreso",
       type: "expense",
       amount: absDeb,
+      currency: cur,
       raw: t,
     };
   }
@@ -242,6 +254,7 @@ function parseDebitCreditLine(line: string, lineNo: number): CsvImportPreviewRow
     description: desc.slice(0, 280) || "Ingreso",
     type: "income",
     amount: absCred,
+    currency: cur,
     raw: t,
   };
 }
