@@ -127,29 +127,62 @@ export function parseItauUruguayPdfText(text: string): {
       continue;
     }
 
+    const description = descLines.join(" ").trim();
+    if (shouldSkipItauDescription(description)) {
+      while (i < lines.length && looksLikeUyAmount(lines[i])) {
+        i++;
+      }
+      skipped++;
+      continue;
+    }
 
-    const amountStr = lines[i];
-    const amount = Math.abs(parseMoneyAR(amountStr));
+    const amountStr1 = lines[i];
     i++;
-
+    let amountStr2: string | undefined;
     if (i < lines.length && looksLikeUyAmount(lines[i])) {
+      amountStr2 = lines[i];
       i++;
     }
 
-    if (!Number.isFinite(amount) || amount === 0) {
-      skipped++;
-      continue;
-    }
+    const descShort = description.slice(0, 280);
+    let type: TransactionType;
+    let amount: number;
 
-    const description = descLines.join(" ").trim();
-    if (shouldSkipItauDescription(description)) {
-      skipped++;
-      continue;
+    if (amountStr2 !== undefined) {
+      const n1 = parseMoneyAR(amountStr1);
+      const n2 = parseMoneyAR(amountStr2);
+      const abs1 = Number.isFinite(n1) ? Math.abs(n1) : 0;
+      const abs2 = Number.isFinite(n2) ? Math.abs(n2) : 0;
+      if (abs1 > 0 && abs2 > 0) {
+        skipped++;
+        continue;
+      }
+      if (abs1 === 0 && abs2 === 0) {
+        skipped++;
+        continue;
+      }
+      /** Orden típico extracto Itaú UY al copiar: débito, luego crédito. */
+      if (abs1 > 0 && abs2 === 0) {
+        type = "expense";
+        amount = abs1;
+      } else {
+        type = "income";
+        amount = abs2;
+      }
+    } else {
+      const signed = parseMoneyAR(amountStr1);
+      if (!Number.isFinite(signed) || signed === 0) {
+        skipped++;
+        continue;
+      }
+      amount = Math.abs(signed);
+      type = classifyItauUy(description);
+      if (signed < 0) {
+        type = "expense";
+      }
     }
 
     const d = new Date(year, mo, day);
-    let type = classifyItauUy(description);
-    const descShort = description.slice(0, 280);
     if (
       type === "income" &&
       shouldReclassifyIncomeAsCardExpense({
@@ -167,7 +200,7 @@ export function parseItauUruguayPdfText(text: string): {
       type,
       amount,
       currency: "UYU",
-      raw: `${line} | ${description} | ${amountStr}`,
+      raw: `${line} | ${description} | ${amountStr1}${amountStr2 ? ` | ${amountStr2}` : ""}`,
     });
   }
 
