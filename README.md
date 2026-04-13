@@ -1,36 +1,45 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Dashboard de finanzas personales
 
-## Getting Started
+Next.js (App Router) + Tailwind + Recharts. Tema oscuro con acentos blancos. Los datos se guardan en **localStorage** del navegador (sin servidor). Podés exportar/importar JSON desde la pestaña **Datos**.
 
-First, run the development server:
+## Funciones
+
+- Ingresos y egresos con categoría, débito/crédito/efectivo/transferencia, pendientes
+- Tarjetas con día de cierre y vencimiento (recordatorios en Consejos)
+- Ingresos recurrentes para estimar ingresos futuros del mes
+- Gráficos: últimos 6 meses, torta por categoría, reparto débito vs crédito
+- Comparativa vs período anterior (misma duración)
+- Lista de deseos con sugerencia según superávit proyectado
+- Exportar / importar respaldo JSON
+- **Dataset demo** reproducible (ventas, onboarding, capturas)
+
+## Demo comercial (replicable)
+
+En la pestaña **Datos**:
+
+- **Cargar dataset demo** reemplaza el estado local por datos ficticios completos (~6 meses, tarjetas, recurrentes, lista de deseos, pendientes). Las fechas se calculan respecto de **la fecha actual**, así las gráficas y el mes en curso siempre se ven bien.
+- **Solo descargar JSON demo** genera el mismo contenido que un respaldo exportable; podés versionarlo en el repo (`demo-seed.json`) o importarlo en otro navegador.
+
+Para mostrar un aviso con enlace rápido en el dashboard (útil en una landing o preview de Vercel), copiá `.env.example` a `.env.local` y definí `NEXT_PUBLIC_SHOW_DEMO_BANNER=true`.
+
+Código: `src/lib/demo-data.ts` (`buildDemoSnapshot`, `buildDemoExportJson`).
+
+## Desarrollo
 
 ```bash
+cd personal-finance-dashboard
+npm install
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Abrir [http://localhost:3000](http://localhost:3000).
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Deploy en Vercel
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+1. Sube el proyecto a GitHub/GitLab/Bitbucket (solo la carpeta `personal-finance-dashboard` como raíz del repo, o monorepo con root en esa carpeta).
+2. En [vercel.com](https://vercel.com), **Add New Project** → importá el repo.
+3. **Framework Preset:** Next.js. **Root Directory:** si el repo es solo esta app, dejá vacío; si está dentro de un monorepo, indicá la subcarpeta.
+4. **Build Command:** `npm run build` (por defecto). **Output:** maneja Vercel automáticamente.
+5. Deploy.
 
-## Learn More
-
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+**Nota:** al no haber backend, cada visitante tiene su propio almacenamiento local en su dispositivo. Para sincronizar entre dispositivos o usuarios, habría que añadir autenticación y base de datos (p. ej. Supabase) en una iteración futura.
