@@ -26,6 +26,9 @@ export function DataBackup() {
   const reclassifyCardPurchasesMislabeledAsIncome = useFinanceStore(
     (s) => s.reclassifyCardPurchasesMislabeledAsIncome,
   );
+  const fixSaaSUsdSubscriptions = useFinanceStore(
+    (s) => s.fixSaaSUsdSubscriptions,
+  );
   const transactionCount = useFinanceStore((s) => s.transactions.length);
   const loadDemoData = useFinanceStore((s) => s.loadDemoData);
   const resetAll = useFinanceStore((s) => s.resetAll);
@@ -173,6 +176,20 @@ export function DataBackup() {
           }}
         >
           Corregir compras TC cargadas como ingreso
+        </button>
+        <button
+          type="button"
+          className="ml-3 mt-4 rounded-lg border border-sky-800/60 px-4 py-2.5 text-sm text-sky-100/90 hover:bg-sky-950/35"
+          onClick={() => {
+            const { updated } = fixSaaSUsdSubscriptions();
+            alert(
+              updated
+                ? `Se actualizaron ${updated} movimientos (OpenAI, Cursor, Spotify, etc.): moneda USD, gasto con TC si estaban como ingreso, y vuelven al resumen del período cuando correspondía.`
+                : "No había filas que califiquen. Si el banco usa otro texto en el detalle, cambiá moneda y tipo a mano en Movimientos.",
+            );
+          }}
+        >
+          Suscripciones USD (OpenAI, Cursor…)
         </button>
       </section>
 

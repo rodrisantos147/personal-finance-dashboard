@@ -10,6 +10,7 @@ import {
   startOfMonth,
   subMonths,
 } from "date-fns";
+import { inferCurrencyFromDescriptionAndHints } from "./currency-hints";
 import { resolveDefaultCurrency, txCurrency } from "./format";
 import type {
   AppSettings,
@@ -74,10 +75,50 @@ export function shouldReclassifyIncomeAsCardExpense(t: {
     return false;
   }
   return (
-    /DLO\*|DLO\s*\*|PEDIDOSYA|PEDIDOS\s*YA|RAPPI|UBER\s*\*?|STM\b|SINERGIA|TU\s+RACION|RACION\b|SPOTIFY|CLAUDE|UTE\b|SODIMAC|TIENDAMIA|BAMBOO|MERPAGO|MP\s*\*|NETFLIX|HBO|PRIME|APPLE\.COM|GOOGLE\s*\*|OPENAI|REPLIT|CURSOR|CLOUDFLARE|SUBSCRIPTION|\bTATA\b|\bBDB\b|\bZARA\b/i.test(
+    /DLO\*|DLO\s*\*|PEDIDOSYA|PEDIDOS\s*YA|RAPPI|UBER\s*\*?|STM\b|SINERGIA|TU\s+RACION|RACION\b|SPOTIFY|CLAUDE|UTE\b|SODIMAC|TIENDAMIA|BAMBOO|MERPAGO|MP\s*\*|NETFLIX|HBO|PRIME|APPLE\.COM|GOOGLE\s*\*|OPENAI|\*OPENAI|OPENAI\*|CHATGPT|REPLIT|CURSOR|CLOUDFLARE|SUBSCRIPTION|\bTATA\b|\bBDB\b|\bZARA\b/i.test(
       u,
     ) || /\bCUOTA\s+\d+\s*\/\s*\d+/i.test(u)
   );
+}
+
+/**
+ * Corrige filas ya guardadas: moneda USD para SaaS (OpenAI, Cursor, etc.),
+ * ingreso→gasto TC si aplica, y saca “fuera del resumen” en gastos SaaS en USD.
+ */
+export function applySaaSUsdAndReclassifyPatches(t: Transaction): {
+  next: Transaction;
+  changed: boolean;
+} {
+  let next = { ...t };
+  let changed = false;
+
+  if (
+    inferCurrencyFromDescriptionAndHints(next.description) === "USD" &&
+    next.currency !== "USD"
+  ) {
+    next = { ...next, currency: "USD" };
+    changed = true;
+  }
+
+  if (shouldReclassifyIncomeAsCardExpense(next)) {
+    next = {
+      ...next,
+      type: "expense",
+      paymentMethod: "credit",
+      category: next.category === "Ingreso" ? "Otros" : next.category,
+      omitFromPeriodSummary: false,
+    };
+    changed = true;
+  }
+
+  const usdSaaS =
+    inferCurrencyFromDescriptionAndHints(t.description) === "USD";
+  if (usdSaaS && next.type === "expense" && next.omitFromPeriodSummary) {
+    next = { ...next, omitFromPeriodSummary: false };
+    changed = true;
+  }
+
+  return { next, changed };
 }
 
 /** Ingresos que en extractos de TC son pagos desde cuenta, no sueldo ni cobros reales. */

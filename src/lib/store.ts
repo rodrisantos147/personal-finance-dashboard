@@ -8,6 +8,7 @@ import {
   resolveDefaultCurrency,
 } from "./format";
 import {
+  applySaaSUsdAndReclassifyPatches,
   inferOmitFromPeriodSummary,
   shouldReclassifyIncomeAsCardExpense,
 } from "./finance";
@@ -81,6 +82,10 @@ interface FinanceState {
    * Pasa a gasto con medio tarjeta los ingresos que parecen compras TC (DLO*, PedidosYa, etc.).
    */
   reclassifyCardPurchasesMislabeledAsIncome: () => { updated: number };
+  /**
+   * OpenAI, Cursor, etc.: moneda USD, ingreso mal clasificado → gasto TC, volver a incluir en resumen.
+   */
+  fixSaaSUsdSubscriptions: () => { updated: number };
   updateTransaction: (id: string, t: Partial<Transaction>) => void;
   removeTransaction: (id: string) => void;
 
@@ -219,6 +224,21 @@ export const useFinanceStore = create<FinanceState>()(
                 paymentMethod: "credit" as const,
                 category: t.category === "Ingreso" ? "Otros" : t.category,
               };
+            })
+            .sort((a, b) => b.date.localeCompare(a.date)),
+        }));
+        return { updated };
+      },
+
+      fixSaaSUsdSubscriptions: () => {
+        let updated = 0;
+        set((s) => ({
+          transactions: s.transactions
+            .map((t) => {
+              const { next, changed } = applySaaSUsdAndReclassifyPatches(t);
+              if (!changed) return t;
+              updated++;
+              return next;
             })
             .sort((a, b) => b.date.localeCompare(a.date)),
         }));

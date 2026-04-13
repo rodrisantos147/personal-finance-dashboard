@@ -1,5 +1,11 @@
+import {
+  inferCurrencyFromDescriptionAndHints,
+  inferCurrencyFromMoneyStrings,
+} from "./currency-hints";
 import { shouldReclassifyIncomeAsCardExpense } from "./finance";
 import type { CurrencyCode, PaymentMethod, TransactionType } from "./types";
+
+export { inferCurrencyFromDescriptionAndHints, inferCurrencyFromMoneyStrings };
 
 export type SingleAmountConvention =
   | "signed"
@@ -145,39 +151,6 @@ const ALIAS = {
   tipo: ["tipo", "tipomovimiento", "clase"],
   moneda: ["moneda", "currency", "divisa"],
 };
-
-export function inferCurrencyFromMoneyStrings(
-  ...raws: string[]
-): CurrencyCode | undefined {
-  for (const raw of raws) {
-    const u = raw.toUpperCase();
-    if (/\b(US\$|U\$S|USD)\b/.test(u) || u.includes("US$")) return "USD";
-    if (/\b(DOLAR|DOLARES|DÓLAR|DÓLARES)\b/.test(u)) return "USD";
-    if (/\bEUR\b|€/.test(u)) return "EUR";
-  }
-  return undefined;
-}
-
-/**
- * Moneda explícita en el texto + pistas típicas de cargos internacionales en USD
- * (suscripciones / SaaS) cuando el extracto no trae columna “moneda”.
- */
-export function inferCurrencyFromDescriptionAndHints(
-  ...parts: string[]
-): CurrencyCode | undefined {
-  const fromMoney = inferCurrencyFromMoneyStrings(...parts);
-  if (fromMoney) return fromMoney;
-  const blob = parts.filter(Boolean).join(" ");
-  if (!blob.trim()) return undefined;
-  if (
-    /\bSPOTIFY\b|\bREPLIT\b|\bCLOUDFLARE\b|\bGITHUB\b|\bOPENAI\b|\bFIGMA\b|\bVERCEL\b|\bDIGITALOCEAN\b|\bSUPABASE\b|\bNOTION\b|\bANTHROPIC\b|\bCLAUDE\.AI\b|\bCURSOR\b/i.test(
-      blob,
-    )
-  ) {
-    return "USD";
-  }
-  return undefined;
-}
 
 function parseCurrencyCell(raw: string): CurrencyCode | undefined {
   const s = raw.trim().toUpperCase();

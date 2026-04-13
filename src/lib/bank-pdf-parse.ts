@@ -1,9 +1,6 @@
 import type { CsvImportResult, CsvImportPreviewRow } from "./csv-import";
-import {
-  inferCurrencyFromDescriptionAndHints,
-  parseDateFlexible,
-  parseMoneyAR,
-} from "./csv-import";
+import { inferCurrencyFromDescriptionAndHints } from "./currency-hints";
+import { parseDateFlexible, parseMoneyAR } from "./csv-import";
 import { shouldReclassifyIncomeAsCardExpense } from "./finance";
 import type { CurrencyCode } from "./types";
 import type { TransactionType } from "./types";
