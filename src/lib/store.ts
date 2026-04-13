@@ -66,11 +66,16 @@ interface FinanceState {
   addTransaction: (t: Omit<Transaction, "id">) => void;
   /**
    * Alta masiva (import CSV / PDF). Omite filas ya iguales a las guardadas
-   * (misma fecha, monto, tipo, descripción, etc.).
+   * y luego elimina duplicados internos por la misma clave.
    */
   importTransactions: (
     items: Omit<Transaction, "id">[],
-  ) => { added: number; skippedDuplicates: number };
+  ) => {
+    added: number;
+    skippedDuplicates: number;
+    /** Filas eliminadas al unificar claves duplicadas en el historial. */
+    removedDuplicates: number;
+  };
   /** Elimina movimientos duplicados ya guardados (una pasada por clave). */
   dedupeTransactions: () => { removed: number };
   /**
@@ -178,12 +183,18 @@ export const useFinanceStore = create<FinanceState>()(
           keys.add(k);
           fresh.push({ ...normalized, id: uid() });
         }
-        set({
-          transactions: [...fresh, ...s.transactions].sort((a, b) =>
-            b.date.localeCompare(a.date),
-          ),
-        });
-        return { added: fresh.length, skippedDuplicates };
+        let merged = [...fresh, ...s.transactions].sort((a, b) =>
+          b.date.localeCompare(a.date),
+        );
+        const beforeDedupe = merged.length;
+        merged = dedupeTransactionsByKey(merged, s.settings);
+        const removedDuplicates = beforeDedupe - merged.length;
+        set({ transactions: merged });
+        return {
+          added: fresh.length,
+          skippedDuplicates,
+          removedDuplicates,
+        };
       },
 
       dedupeTransactions: () => {

@@ -1,8 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { CsvImport } from "@/components/CsvImport";
-import { PdfImport } from "@/components/PdfImport";
+import { StatementImport } from "@/components/StatementImport";
 import { april2026Card8002Movements } from "@/lib/card-import-april-2026-8002";
 import { buildDemoExportJson } from "@/lib/demo-data";
 import {
@@ -19,7 +18,6 @@ export function DataBackup() {
   const exportData = useFinanceStore((s) => s.exportData);
   const importData = useFinanceStore((s) => s.importData);
   const importTransactions = useFinanceStore((s) => s.importTransactions);
-  const dedupeTransactions = useFinanceStore((s) => s.dedupeTransactions);
   const reapplyIncomeOmitHeuristic = useFinanceStore(
     (s) => s.reapplyIncomeOmitHeuristic,
   );
@@ -42,14 +40,12 @@ export function DataBackup() {
   return (
     <div className="space-y-8">
       <section className="rounded-xl border border-white/15 bg-zinc-900/60 p-6">
-        <h2 className="text-lg font-medium text-white">Dataset demo (ventas / onboarding)</h2>
+        <h2 className="text-lg font-medium text-white">Dataset demo</h2>
         <p className="mt-2 text-sm text-zinc-400">
-          Carga ficticia reproducible: ~6 meses de movimientos, dos tarjetas,
-          ingresos recurrentes, lista de deseos y pendientes. Las fechas se
-          generan respecto de <strong className="text-zinc-200">hoy</strong>, así
-          las gráficas y el &quot;mes actual&quot; se ven bien en cualquier
-          momento. Podés también descargar el mismo contenido como JSON (mismo
-          formato que un respaldo) para compartirlo o versionarlo en el repo.
+          Datos de ejemplo (~6 meses, tarjetas, ingresos recurrentes, deseos).
+          Las fechas se generan respecto de{" "}
+          <strong className="text-zinc-200">hoy</strong>. Podés descargar el
+          mismo contenido como JSON (formato de respaldo).
         </p>
         <div className="mt-4 flex flex-wrap gap-3">
           <button
@@ -82,122 +78,95 @@ export function DataBackup() {
               URL.revokeObjectURL(url);
             }}
           >
-            Solo descargar JSON demo
+            Descargar JSON demo
           </button>
         </div>
+        <details className="mt-4 rounded-lg border border-emerald-900/40 bg-emerald-950/15 p-3">
+          <summary className="cursor-pointer text-sm text-emerald-200/90">
+            Extracto TC ****8002 (abril 2026) — opcional
+          </summary>
+          <p className="mt-2 text-xs text-zinc-500">
+            15 movimientos de ejemplo (PedidosYa, Spotify, UTE, pago TC, etc.).
+            Se suman al historial actual.
+          </p>
+          <button
+            type="button"
+            className="mt-3 rounded-lg bg-emerald-700 px-3 py-2 text-sm font-medium text-white hover:bg-emerald-600"
+            onClick={() => {
+              if (
+                confirm(
+                  `Agregar ${april2026Card8002Movements.length} movimientos de abril 2026?`,
+                )
+              ) {
+                const { added, skippedDuplicates, removedDuplicates } =
+                  importTransactions(april2026Card8002Movements);
+                const bits = [
+                  `Agregados ${added}.`,
+                  skippedDuplicates
+                    ? `${skippedDuplicates} ya estaban (omitidos).`
+                    : null,
+                  removedDuplicates
+                    ? `Eliminados ${removedDuplicates} duplicados internos.`
+                    : null,
+                ].filter(Boolean);
+                alert(bits.join(" "));
+              }
+            }}
+          >
+            Agregar movimientos TC 8002
+          </button>
+        </details>
       </section>
 
-      <section className="rounded-xl border border-emerald-900/40 bg-emerald-950/20 p-6">
-        <h2 className="text-lg font-medium text-white">
-          Extracto TC ****8002 — abril 2026
-        </h2>
-        <p className="mt-2 text-sm text-zinc-400">
-          Carga los 15 movimientos del resumen que importaste (PedidosYa, Spotify, Claude,
-          UTE, SODIMAC, pago de tarjeta, cuotas, etc.). Se suman a lo que ya tengas en
-          este navegador; no borra datos.
-        </p>
-        <button
-          type="button"
-          className="mt-4 rounded-lg bg-emerald-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-emerald-500"
-          onClick={() => {
-            if (
-              confirm(
-                `Agregar ${april2026Card8002Movements.length} movimientos de abril 2026 al historial actual?`,
-              )
-            ) {
-              const { added, skippedDuplicates } = importTransactions(
-                april2026Card8002Movements,
-              );
-              alert(
-                skippedDuplicates
-                  ? `Agregados ${added}. ${skippedDuplicates} ya estaban (duplicados omitidos).`
-                  : `Agregados ${added} movimientos. Revisá Resumen o Movimientos.`,
-              );
-            }
-          }}
-        >
-          Agregar movimientos TC 8002 (abr 2026)
-        </button>
-      </section>
-
-      <CsvImport />
-
-      <PdfImport />
+      <StatementImport />
 
       <section className="rounded-xl border border-zinc-800 bg-zinc-900/40 p-6">
-        <h2 className="text-lg font-medium text-white">Duplicados en movimientos</h2>
+        <h2 className="text-lg font-medium text-white">Mantenimiento</h2>
         <p className="mt-2 text-sm text-zinc-500">
-          Si importaste el mismo extracto dos veces, podés dejar una sola fila por
-          movimiento (misma fecha, monto, tipo, descripción, moneda, categoría y
-          medio). También se omiten duplicados al importar CSV/PDF y al cargar la
-          app.
+          Movimientos guardados: {transactionCount}. Al importar, los duplicados
+          se omiten o se unifican automáticamente.
         </p>
-        <p className="mt-2 text-xs text-zinc-600">
-          Movimientos guardados: {transactionCount}
-        </p>
-        <button
-          type="button"
-          className="mt-4 rounded-lg border border-zinc-600 px-4 py-2.5 text-sm text-zinc-200 hover:bg-zinc-800"
-          onClick={() => {
-            const { removed } = dedupeTransactions();
-            alert(
-              removed
-                ? `Se eliminaron ${removed} movimientos duplicados.`
-                : "No había duplicados con la misma clave.",
-            );
-          }}
-        >
-          Quitar duplicados ahora
-        </button>
-        <button
-          type="button"
-          className="ml-3 mt-4 rounded-lg border border-zinc-600 px-4 py-2.5 text-sm text-zinc-200 hover:bg-zinc-800"
-          onClick={() => {
-            const { updated } = reapplyIncomeOmitHeuristic();
-            alert(
-              updated
-                ? `Se marcaron ${updated} ingresos como "fuera del resumen" (suelen ser pagos de tarjeta). Revisá Resumen.`
-                : "No se encontraron ingresos nuevos que califiquen. Si un pago de TC sigue sumando, marcálo a mano en Movimientos.",
-            );
-          }}
-        >
-          Detectar pagos de tarjeta en ingresos
-        </button>
-        <button
-          type="button"
-          className="ml-3 mt-4 rounded-lg border border-amber-800/60 px-4 py-2.5 text-sm text-amber-100/90 hover:bg-amber-950/40"
-          onClick={() => {
-            const { updated } = reclassifyCardPurchasesMislabeledAsIncome();
-            alert(
-              updated
-                ? `Se pasaron ${updated} movimientos de ingreso a gasto con tarjeta (compras mal clasificadas). Revisá Resumen y Movimientos.`
-                : "No había ingresos que coincidan con el patrón (ej. DLO*, PedidosYa). Si falta alguno, corregilo a mano.",
-            );
-          }}
-        >
-          Corregir compras TC cargadas como ingreso
-        </button>
-        <button
-          type="button"
-          className="ml-3 mt-4 rounded-lg border border-sky-800/60 px-4 py-2.5 text-sm text-sky-100/90 hover:bg-sky-950/35"
-          onClick={() => {
-            const { updated } = fixSaaSUsdSubscriptions();
-            alert(
-              updated
-                ? `Se actualizaron ${updated} movimientos (OpenAI, Cursor, Spotify, etc.): moneda USD, gasto con TC si estaban como ingreso, y vuelven al resumen del período cuando correspondía.`
-                : "No había filas que califiquen. Si el banco usa otro texto en el detalle, cambiá moneda y tipo a mano en Movimientos.",
-            );
-          }}
-        >
-          Suscripciones USD (OpenAI, Cursor…)
-        </button>
+        <details className="mt-4 rounded-lg border border-zinc-800 bg-zinc-950/40 p-3">
+          <summary className="cursor-pointer text-sm text-zinc-400">
+            Corregir clasificación (pagos TC, compras mal como ingreso, USD
+            SaaS)
+          </summary>
+          <p className="mt-2 text-xs text-zinc-600">
+            Ejecuta las tres heurísticas en un solo paso. Revisá Resumen y
+            Movimientos después.
+          </p>
+          <button
+            type="button"
+            className="mt-3 rounded-lg border border-zinc-600 px-4 py-2.5 text-sm text-zinc-200 hover:bg-zinc-800"
+            onClick={() => {
+              const a = reapplyIncomeOmitHeuristic();
+              const b = reclassifyCardPurchasesMislabeledAsIncome();
+              const c = fixSaaSUsdSubscriptions();
+              alert(
+                [
+                  a.updated
+                    ? `Pagos de tarjeta en ingresos: ${a.updated} actualizados.`
+                    : "Pagos TC en ingresos: sin cambios.",
+                  b.updated
+                    ? `Compras TC como ingreso: ${b.updated} corregidas.`
+                    : "Compras TC como ingreso: sin cambios.",
+                  c.updated
+                    ? `Suscripciones USD (OpenAI, Cursor…): ${c.updated} corregidas.`
+                    : "Suscripciones USD: sin cambios.",
+                ].join(" "),
+              );
+            }}
+          >
+            Aplicar correcciones automáticas
+          </button>
+        </details>
       </section>
 
       <section className="rounded-xl border border-zinc-800 bg-zinc-900/40 p-6">
         <h2 className="text-lg font-medium text-white">Ajustes generales</h2>
         <p className="mt-2 text-sm text-zinc-500">
-          Moneda por defecto para movimientos nuevos, importaciones y la vista de
-          reportes cuando elegís una sola moneda.
+          Moneda por defecto para movimientos nuevos, importaciones y reportes
+          en una sola moneda.
         </p>
         <label className="mt-4 flex max-w-sm flex-col gap-1 text-sm">
           <span className="text-zinc-400">Moneda por defecto</span>
@@ -241,8 +210,8 @@ export function DataBackup() {
             className="rounded-lg border border-zinc-700 bg-zinc-950 px-3 py-2 text-white"
           />
           <span className="text-xs text-zinc-600">
-            Opcional. Mezcla UYU y USD en KPI, histórico y comparación con el período
-            anterior cuando el informe está en pesos o dólares.
+            Opcional. Mezcla UYU y USD en KPI e informes cuando elegís una sola
+            moneda.
           </span>
         </label>
       </section>
@@ -250,9 +219,8 @@ export function DataBackup() {
       <section className="rounded-xl border border-zinc-800 bg-zinc-900/40 p-6">
         <h2 className="text-lg font-medium text-white">Saldo inicial</h2>
         <p className="mt-2 text-sm text-zinc-500">
-          Opcional: usalo si querés proyectar acumulado desde antes del primer
-          registro (próxima versión puede usarlo en reportes). El monto se interpreta
-          en la moneda por defecto.
+          Opcional: proyección de acumulado desde antes del primer registro. El
+          monto va en la moneda por defecto.
         </p>
         <label className="mt-4 flex max-w-sm flex-col gap-1 text-sm">
           <span className="text-zinc-400">Monto</span>
@@ -270,8 +238,8 @@ export function DataBackup() {
       <section className="rounded-xl border border-zinc-800 bg-zinc-900/40 p-6">
         <h2 className="text-lg font-medium text-white">Ingresos recurrentes</h2>
         <p className="mt-2 text-sm text-zinc-500">
-          Sueldo u otros ingresos fijos por día del mes. Se usan para estimar
-          ingresos futuros del mes.
+          Sueldo u otros ingresos fijos por día del mes (estimación de ingresos
+          futuros).
         </p>
         <form
           className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-5"
@@ -389,8 +357,7 @@ export function DataBackup() {
       <section className="rounded-xl border border-zinc-800 bg-zinc-900/40 p-6">
         <h2 className="text-lg font-medium text-white">Exportar / importar</h2>
         <p className="mt-2 text-sm text-zinc-500">
-          Descargá un JSON con todo. Guardalo en un lugar seguro. Importar
-          reemplaza los datos locales actuales.
+          JSON completo. Importar reemplaza los datos locales actuales.
         </p>
         <div className="mt-4 flex flex-wrap gap-3">
           <button
