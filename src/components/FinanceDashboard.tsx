@@ -633,6 +633,13 @@ export function FinanceDashboard() {
                     No incluye filas marcadas &quot;fuera del resumen&quot; (pagos a
                     tarjeta / traspasos) en Movimientos.
                   </p>
+                  <p>
+                    Si un sueldo o traspaso en pesos te aparece multiplicado (como si
+                    fuera en dólares), en Movimientos revisá que esa fila no tenga
+                    moneda <strong className="text-zinc-400">USD</strong> por el texto
+                    del extracto; cambiala a UYU o volvé a importar tras actualizar la
+                    app.
+                  </p>
                   {incomeAuditLines.length > 0 && (
                     <div className="border-t border-zinc-800/90 pt-2">
                       <p className="mb-1.5 font-medium text-zinc-500">
