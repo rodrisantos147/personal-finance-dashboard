@@ -11,6 +11,7 @@ Next.js (App Router) + Tailwind + Recharts. Tema oscuro con acentos blancos. Los
 - Comparativa vs período anterior (misma duración)
 - Lista de deseos con sugerencia según superávit proyectado
 - Exportar / importar respaldo JSON
+- **Importar CSV** (export del banco o Excel guardado como CSV) para cargar meses anteriores de una vez
 - **Dataset demo** reproducible (ventas, onboarding, capturas)
 
 ## Demo comercial (replicable)
@@ -23,6 +24,10 @@ En la pestaña **Datos**:
 Para mostrar un aviso con enlace rápido en el dashboard (útil en una landing o preview de Vercel), copiá `.env.example` a `.env.local` y definí `NEXT_PUBLIC_SHOW_DEMO_BANNER=true`.
 
 Código: `src/lib/demo-data.ts` (`buildDemoSnapshot`, `buildDemoExportJson`).
+
+### Estados de cuenta en CSV
+
+En **Datos** → **Importar desde CSV**: subí el archivo o pegá el texto. Se detectan columnas típicas (**Fecha**, **Descripción**, **Débito** / **Crédito**, o **Monto**). Podés mezclar varios meses en un solo archivo. Si el banco exporta una sola columna de importe, usá signo (negativo = egreso) o indicá que todo es egreso/ingreso. La categoría y el medio de pago por defecto se aplican a todo el lote (después podés editar o borrar filas en Movimientos).
 
 ## Desarrollo
 

@@ -39,6 +39,8 @@ interface FinanceState {
 
   setSettings: (s: Partial<AppSettings>) => void;
   addTransaction: (t: Omit<Transaction, "id">) => void;
+  /** Alta masiva (import CSV); preserva movimientos ya cargados. */
+  importTransactions: (items: Omit<Transaction, "id">[]) => void;
   updateTransaction: (id: string, t: Partial<Transaction>) => void;
   removeTransaction: (id: string) => void;
 
@@ -88,6 +90,14 @@ export const useFinanceStore = create<FinanceState>()(
           transactions: [
             ...s.transactions,
             { ...t, id: uid() },
+          ].sort((a, b) => b.date.localeCompare(a.date)),
+        })),
+
+      importTransactions: (items) =>
+        set((s) => ({
+          transactions: [
+            ...items.map((t) => ({ ...t, id: uid() })),
+            ...s.transactions,
           ].sort((a, b) => b.date.localeCompare(a.date)),
         })),
 
