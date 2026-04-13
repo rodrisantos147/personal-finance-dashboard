@@ -16,7 +16,7 @@ import {
   Settings2,
   Table2,
 } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import {
   Bar,
   BarChart,
@@ -55,9 +55,6 @@ type Tab = "overview" | "movements" | "cards" | "wishlist" | "tips" | "data";
 const PIE_COLORS = ["#fafafa", "#d4d4d8", "#a1a1aa", "#71717a", "#52525b", "#3f3f46"];
 
 export function FinanceDashboard() {
-  const [mounted, setMounted] = useState(false);
-  useEffect(() => setMounted(true), []);
-
   const settings = useFinanceStore((s) => s.settings);
   const transactions = useFinanceStore((s) => s.transactions);
   const creditCards = useFinanceStore((s) => s.creditCards);
@@ -136,14 +133,6 @@ export function FinanceDashboard() {
 
   const projectedSurplus =
     income - expense + pendingIncome - pendingExpense + future.total;
-
-  if (!mounted) {
-    return (
-      <div className="flex min-h-[50vh] items-center justify-center text-zinc-500">
-        Cargando datos locales…
-      </div>
-    );
-  }
 
   const fmt = (n: number) => formatMoney(n, settings);
 
