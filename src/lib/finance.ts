@@ -71,15 +71,47 @@ export function pendingTotals(transactions: Transaction[]) {
   return { pendingIncome, pendingExpense };
 }
 
+function dateFromEntryClosing(
+  year: number,
+  month1: number,
+  closingDay: number,
+): Date {
+  const dim = daysInMonth(year, month1 - 1);
+  return new Date(year, month1 - 1, Math.min(closingDay, dim));
+}
+
+function dateFromEntryDue(
+  year: number,
+  month1: number,
+  dueDay: number,
+): Date {
+  const dim = daysInMonth(year, month1 - 1);
+  return new Date(year, month1 - 1, Math.min(dueDay, dim));
+}
+
 /** Próxima fecha de cierre >= from */
 export function nextClosingDate(card: CreditCard, from: Date): Date {
+  const start = startOfDay(from);
+  if (card.annualSchedule?.length) {
+    let best: Date | null = null;
+    for (const e of card.annualSchedule) {
+      const d = dateFromEntryClosing(e.year, e.month, e.closingDay);
+      if (!isBefore(d, start)) {
+        if (!best || isBefore(d, best)) best = d;
+      }
+    }
+    if (best) return best;
+  }
   const y = from.getFullYear();
   const m = from.getMonth();
   const day = Math.min(card.closingDay, daysInMonth(y, m));
   let candidate = new Date(y, m, day);
-  if (isBefore(candidate, startOfDay(from))) {
+  if (isBefore(candidate, start)) {
     const nm = addMonths(candidate, 1);
-    const d2 = Math.min(card.closingDay, daysInMonth(nm.getFullYear(), nm.getMonth()));
+    const d2 = Math.min(
+      card.closingDay,
+      daysInMonth(nm.getFullYear(), nm.getMonth()),
+    );
     candidate = new Date(nm.getFullYear(), nm.getMonth(), d2);
   }
   return candidate;
@@ -87,13 +119,27 @@ export function nextClosingDate(card: CreditCard, from: Date): Date {
 
 /** Próximo vencimiento >= from */
 export function nextDueDate(card: CreditCard, from: Date): Date {
+  const start = startOfDay(from);
+  if (card.annualSchedule?.length) {
+    let best: Date | null = null;
+    for (const e of card.annualSchedule) {
+      const d = dateFromEntryDue(e.year, e.month, e.dueDay);
+      if (!isBefore(d, start)) {
+        if (!best || isBefore(d, best)) best = d;
+      }
+    }
+    if (best) return best;
+  }
   const y = from.getFullYear();
   const m = from.getMonth();
   const day = Math.min(card.dueDay, daysInMonth(y, m));
   let candidate = new Date(y, m, day);
-  if (isBefore(candidate, startOfDay(from))) {
+  if (isBefore(candidate, start)) {
     const nm = addMonths(candidate, 1);
-    const d2 = Math.min(card.dueDay, daysInMonth(nm.getFullYear(), nm.getMonth()));
+    const d2 = Math.min(
+      card.dueDay,
+      daysInMonth(nm.getFullYear(), nm.getMonth()),
+    );
     candidate = new Date(nm.getFullYear(), nm.getMonth(), d2);
   }
   return candidate;

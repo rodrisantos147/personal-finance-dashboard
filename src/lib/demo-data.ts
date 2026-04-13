@@ -5,6 +5,10 @@ import {
   startOfMonth,
   subMonths,
 } from "date-fns";
+import {
+  fallbackDaysFromSchedule,
+  ITAU_STYLE_2026_SCHEDULE,
+} from "./card-schedules";
 import type {
   AppSettings,
   CreditCard,
@@ -196,8 +200,16 @@ export function buildDemoSnapshot(referenceDate: Date = new Date()): DemoSnapsho
 
   transactions.sort((a, b) => b.date.localeCompare(a.date));
 
+  const demoSchedule = ITAU_STYLE_2026_SCHEDULE;
+  const demoFb = fallbackDaysFromSchedule(demoSchedule);
   const creditCards: CreditCard[] = [
-    { id: CARD_VISA, name: "Visa Crédito (demo)", closingDay: 12, dueDay: 20 },
+    {
+      id: CARD_VISA,
+      name: "Visa Crédito (demo — calendario 2026)",
+      closingDay: demoFb.closingDay,
+      dueDay: demoFb.dueDay,
+      annualSchedule: [...demoSchedule],
+    },
     { id: CARD_MC, name: "Mastercard (demo)", closingDay: 25, dueDay: 5 },
   ];
 

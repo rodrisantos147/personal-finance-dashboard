@@ -5,7 +5,7 @@ Next.js (App Router) + Tailwind + Recharts. Tema oscuro con acentos blancos. Los
 ## Funciones
 
 - Ingresos y egresos con categoría, débito/crédito/efectivo/transferencia, pendientes
-- Tarjetas con día de cierre y vencimiento (recordatorios en Consejos)
+- Tarjetas con día de cierre y vencimiento (recordatorios en Consejos); opcional **calendario mensual** (ej. tabla 2026 tipo Itaú)
 - Ingresos recurrentes para estimar ingresos futuros del mes
 - Gráficos: últimos 6 meses, torta por categoría, reparto débito vs crédito
 - Comparativa vs período anterior (misma duración)

@@ -15,13 +15,24 @@ export interface Transaction {
   isPending: boolean;
 }
 
+/** Un mes concreto cuando el banco no usa el mismo día todos los meses. */
+export interface CreditCardMonthEntry {
+  year: number;
+  /** 1–12 */
+  month: number;
+  closingDay: number;
+  dueDay: number;
+}
+
 export interface CreditCard {
   id: string;
   name: string;
-  /** Día de cierre del resumen (1–31) */
+  /** Día de cierre del resumen (1–31) — usado si no hay `annualSchedule` o fuera del calendario */
   closingDay: number;
   /** Día de vencimiento de pago (1–31) */
   dueDay: number;
+  /** Opcional: cierre/vencimiento por mes (ej. tabla anual del home banking). */
+  annualSchedule?: CreditCardMonthEntry[];
 }
 
 export type WishlistPriority = "low" | "medium" | "high";
