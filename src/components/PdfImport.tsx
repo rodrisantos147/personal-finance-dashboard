@@ -5,6 +5,7 @@ import { parseBankStatementPdfText } from "@/lib/bank-pdf-parse";
 import type { CsvImportPreviewRow } from "@/lib/csv-import";
 import { formatMoneyWithSettings, resolveDefaultCurrency } from "@/lib/format";
 import { extractTextFromPdfFile } from "@/lib/pdf-extract";
+import { inferOmitFromPeriodSummary } from "@/lib/finance";
 import { useFinanceStore } from "@/lib/store";
 import type { CurrencyCode, PaymentMethod } from "@/lib/types";
 
@@ -85,6 +86,9 @@ export function PdfImport() {
         paymentMethod: r.type === "expense" ? payExpense : payIncome,
         description: r.description,
         isPending: false,
+        ...(inferOmitFromPeriodSummary(r.type, r.description)
+          ? { omitFromPeriodSummary: true }
+          : {}),
       })),
     );
     setRawText("");

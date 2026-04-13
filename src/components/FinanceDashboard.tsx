@@ -486,6 +486,12 @@ export function FinanceDashboard() {
                   ? `vs mes calendario anterior: ${fmtDeltaPct(comparison.deltaIncomePct)}`
                   : `vs período anterior (${comparison.prevFrom.toLocaleDateString("es-UY")} — ${comparison.prevTo.toLocaleDateString("es-UY")}): ${fmtDeltaPct(comparison.deltaIncomePct)}`
               }
+              detail={
+                <span className="text-[11px] leading-snug text-zinc-600">
+                  No incluye pagos a tarjeta ni traspasos marcados &quot;fuera del
+                  resumen&quot; en Movimientos.
+                </span>
+              }
               positive
             />
             <Kpi

@@ -31,6 +31,7 @@ export function MovementsTable({
   const expenseCategories = useFinanceStore((s) => s.expenseCategories);
   const creditCards = useFinanceStore((s) => s.creditCards);
   const addTransaction = useFinanceStore((s) => s.addTransaction);
+  const updateTransaction = useFinanceStore((s) => s.updateTransaction);
   const removeTransaction = useFinanceStore((s) => s.removeTransaction);
   const addExpenseCategory = useFinanceStore((s) => s.addExpenseCategory);
 
@@ -42,6 +43,7 @@ export function MovementsTable({
   const [cardId, setCardId] = useState("");
   const [description, setDescription] = useState("");
   const [isPending, setIsPending] = useState(false);
+  const [omitFromPeriodSummary, setOmitFromPeriodSummary] = useState(false);
   const [newCat, setNewCat] = useState("");
   const [txCur, setTxCur] = useState<CurrencyCode>(() =>
     resolveDefaultCurrency(settings),
@@ -77,10 +79,12 @@ export function MovementsTable({
           : undefined,
       description: description.trim() || "Sin descripción",
       isPending,
+      ...(omitFromPeriodSummary ? { omitFromPeriodSummary: true } : {}),
     });
     setAmount("");
     setDescription("");
     setIsPending(false);
+    setOmitFromPeriodSummary(false);
   }
 
   return (
@@ -226,6 +230,17 @@ export function MovementsTable({
             Pendiente (aún no cobrado / no pagado)
           </label>
 
+          <label className="flex cursor-pointer items-center gap-2 text-sm text-zinc-400 sm:col-span-2">
+            <input
+              type="checkbox"
+              checked={omitFromPeriodSummary}
+              onChange={(e) => setOmitFromPeriodSummary(e.target.checked)}
+              className="h-4 w-4 rounded border-zinc-600"
+            />
+            No sumar en ingresos/gastos del resumen (pago de tarjeta, traspaso
+            entre cuentas)
+          </label>
+
           <div className="sm:col-span-2 lg:col-span-3">
             <button
               type="submit"
@@ -254,13 +269,14 @@ export function MovementsTable({
                 <th className="px-4 py-3">Medio</th>
                 <th className="px-4 py-3">Mon.</th>
                 <th className="px-4 py-3 text-right">Monto</th>
+                <th className="px-4 py-3 text-right">Resumen</th>
                 <th className="px-4 py-3" />
               </tr>
             </thead>
             <tbody className="divide-y divide-zinc-800">
               {slice.length === 0 && (
                 <tr>
-                  <td colSpan={8} className="px-4 py-8 text-center text-zinc-500">
+                  <td colSpan={9} className="px-4 py-8 text-center text-zinc-500">
                     No hay movimientos en este período.
                   </td>
                 </tr>
@@ -284,6 +300,9 @@ export function MovementsTable({
                     {t.isPending && (
                       <span className="ml-2 text-xs text-amber-400">pend.</span>
                     )}
+                    {t.omitFromPeriodSummary && (
+                      <span className="ml-2 text-xs text-zinc-500">sin KPI</span>
+                    )}
                   </td>
                   <td className="max-w-[200px] truncate px-4 py-3 text-zinc-200">
                     {t.description}
@@ -305,6 +324,21 @@ export function MovementsTable({
                   >
                     {t.type === "income" ? "+" : "−"}
                     {fmtRow(t.amount, txCurrency(t, settings))}
+                  </td>
+                  <td className="px-4 py-3 text-right">
+                    <button
+                      type="button"
+                      className="text-xs text-zinc-500 underline decoration-zinc-600 hover:text-zinc-300"
+                      onClick={() =>
+                        updateTransaction(t.id, {
+                          omitFromPeriodSummary: !t.omitFromPeriodSummary,
+                        })
+                      }
+                    >
+                      {t.omitFromPeriodSummary
+                        ? "Incluir en resumen"
+                        : "Fuera del resumen"}
+                    </button>
                   </td>
                   <td className="px-4 py-3 text-right">
                     <button

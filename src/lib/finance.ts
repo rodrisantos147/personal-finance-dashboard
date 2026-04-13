@@ -17,6 +17,7 @@ import type {
   CurrencyCode,
   RecurringIncome,
   Transaction,
+  TransactionType,
 } from "./types";
 
 export function filterByDateRange(
@@ -30,6 +31,30 @@ export function filterByDateRange(
   });
 }
 
+/** Ingresos que entran en KPI / resultado del período (excluye pagos TC, traspasos). */
+export function countsAsPeriodIncome(t: Transaction): boolean {
+  return t.type === "income" && !t.omitFromPeriodSummary;
+}
+
+/** Egresos que entran en KPI / resultado del período. */
+export function countsAsPeriodExpense(t: Transaction): boolean {
+  return t.type === "expense" && !t.omitFromPeriodSummary;
+}
+
+/**
+ * Heurística para import: ingresos que en extractos de TC son pagos desde cuenta,
+ * no sueldo ni cobros reales.
+ */
+export function inferOmitFromPeriodSummary(
+  type: TransactionType,
+  description: string,
+): boolean {
+  if (type !== "income") return false;
+  return /RECIBO\s+DE\s+PAGO|RECIBO\s+PAGO.*TARJETA|PAGO\s+(DE\s+)?TARJETA|PAGO\s+TC\b|TARJETA\s*\*{2,}/i.test(
+    description.trim(),
+  );
+}
+
 export function sumIncome(
   transactions: Transaction[],
   settings: AppSettings,
@@ -38,7 +63,7 @@ export function sumIncome(
   return transactions
     .filter(
       (t) =>
-        t.type === "income" && txCurrency(t, settings) === currency,
+        countsAsPeriodIncome(t) && txCurrency(t, settings) === currency,
     )
     .reduce((s, t) => s + t.amount, 0);
 }
@@ -51,7 +76,7 @@ export function sumExpense(
   return transactions
     .filter(
       (t) =>
-        t.type === "expense" && txCurrency(t, settings) === currency,
+        countsAsPeriodExpense(t) && txCurrency(t, settings) === currency,
     )
     .reduce((s, t) => s + t.amount, 0);
 }
@@ -63,7 +88,7 @@ function sumIncomeNonUyuUsd(
 ): number {
   let s = 0;
   for (const t of transactions) {
-    if (t.type !== "income") continue;
+    if (!countsAsPeriodIncome(t)) continue;
     const c = txCurrency(t, settings);
     if (c !== "UYU" && c !== "USD") s += t.amount;
   }
@@ -76,7 +101,7 @@ function sumExpenseNonUyuUsd(
 ): number {
   let s = 0;
   for (const t of transactions) {
-    if (t.type !== "expense") continue;
+    if (!countsAsPeriodExpense(t)) continue;
     const c = txCurrency(t, settings);
     if (c !== "UYU" && c !== "USD") s += t.amount;
   }
@@ -170,7 +195,7 @@ export function combinedExpenseByPaymentReferenceUyu(
   let credit = 0;
   let otherPay = 0;
   for (const t of transactions) {
-    if (t.type !== "expense") continue;
+    if (!countsAsPeriodExpense(t)) continue;
     const cur = txCurrency(t, settings);
     const equiv =
       cur === "UYU"
@@ -218,7 +243,7 @@ export function expensesByCategoryDual(
 ): CategoryExpenseDualRow[] {
   const map = new Map<string, CategoryExpenseDualRow>();
   for (const t of transactions) {
-    if (t.type !== "expense") continue;
+    if (!countsAsPeriodExpense(t)) continue;
     const k = t.category || "Sin categoría";
     if (!map.has(k)) {
       map.set(k, {
@@ -285,7 +310,7 @@ export function expensesByCategory(
 ) {
   const map = new Map<string, number>();
   for (const t of transactions) {
-    if (t.type !== "expense") continue;
+    if (!countsAsPeriodExpense(t)) continue;
     if (txCurrency(t, settings) !== currency) continue;
     const k = t.category || "Sin categoría";
     map.set(k, (map.get(k) ?? 0) + t.amount);
@@ -304,7 +329,7 @@ export function debitVsCredit(
   let credit = 0;
   let other = 0;
   for (const t of transactions) {
-    if (t.type !== "expense") continue;
+    if (!countsAsPeriodExpense(t)) continue;
     if (txCurrency(t, settings) !== currency) continue;
     if (t.paymentMethod === "debit") debit += t.amount;
     else if (t.paymentMethod === "credit") credit += t.amount;
@@ -322,6 +347,7 @@ export function pendingTotals(
   let pendingExpense = 0;
   for (const t of transactions) {
     if (!t.isPending) continue;
+    if (t.omitFromPeriodSummary) continue;
     if (txCurrency(t, settings) !== currency) continue;
     if (t.type === "income") pendingIncome += t.amount;
     else pendingExpense += t.amount;
@@ -467,7 +493,7 @@ export function estimateFutureIncome(
   }
   let fromPending = 0;
   for (const t of transactions) {
-    if (t.type !== "income" || !t.isPending) continue;
+    if (!countsAsPeriodIncome(t) || !t.isPending) continue;
     if (txCurrency(t, settings) !== currency) continue;
     const d = new Date(t.date);
     if (isAfter(d, today) && !isAfter(d, horizonEnd)) {
@@ -610,9 +636,17 @@ export function compareToPreviousPeriod(
   const curExpense = curTotals.expense;
   const prevIncome = prevTotals.income;
   const prevExpense = prevTotals.expense;
-  /** Variación en % con un decimal (evita −100% cuando en realidad hubo algo de ingreso/gasto). */
-  const pct = (a: number, b: number) =>
-    b === 0 ? (a === 0 ? 0 : 100) : Math.round(((a - b) / b) * 1000) / 10;
+  /** Variación en % con un decimal; tope ±500 para evitar +69000% cuando el mes anterior ~0. */
+  const pct = (a: number, b: number) => {
+    if (b === 0) return a === 0 ? 0 : 100;
+    const raw = ((a - b) / b) * 100;
+    if (!Number.isFinite(raw)) return 0;
+    const rounded = Math.round(raw * 10) / 10;
+    const cap = 500;
+    if (rounded > cap) return cap;
+    if (rounded < -cap) return -cap;
+    return rounded;
+  };
   return {
     prevFrom,
     prevTo,

@@ -129,6 +129,8 @@ export const april2026Card8002Movements: Omit<Transaction, "id">[] = [
     paymentMethod: "transfer",
     description: "RECIBO DE PAGO tarjeta ****8002",
     isPending: false,
+    /** Pago desde cuenta: no es “ganancia”, no suma en ingresos del resumen. */
+    omitFromPeriodSummary: true,
   },
   {
     type: "income",

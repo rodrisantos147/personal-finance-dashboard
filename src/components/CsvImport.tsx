@@ -7,6 +7,7 @@ import {
   type CsvImportPreviewRow,
   type SingleAmountConvention,
 } from "@/lib/csv-import";
+import { inferOmitFromPeriodSummary } from "@/lib/finance";
 import { useFinanceStore } from "@/lib/store";
 import type { CurrencyCode, PaymentMethod } from "@/lib/types";
 
@@ -71,6 +72,9 @@ export function CsvImport() {
         paymentMethod: r.type === "expense" ? payExpense : payIncome,
         description: r.description,
         isPending: false,
+        ...(inferOmitFromPeriodSummary(r.type, r.description)
+          ? { omitFromPeriodSummary: true }
+          : {}),
       })),
     );
     setText("");

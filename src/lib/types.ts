@@ -18,6 +18,11 @@ export interface Transaction {
   description: string;
   /** Cobro/pago aún no liquidado o ingreso esperado */
   isPending: boolean;
+  /**
+   * Si es true, no suma en ingresos/gastos ni resultado del período en el resumen
+   * (pago de tarjeta desde cuenta, traspasos entre cuentas propias). Sigue en la lista de movimientos.
+   */
+  omitFromPeriodSummary?: boolean;
 }
 
 /** Un mes concreto cuando el banco no usa el mismo día todos los meses. */
