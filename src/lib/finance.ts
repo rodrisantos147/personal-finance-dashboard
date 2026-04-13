@@ -215,6 +215,53 @@ function sumExpenseNonUyuUsd(
   return s;
 }
 
+/** Referencia aproximada solo si no cargaste tipo de cambio en Datos y hay UYU+USD. */
+export const FALLBACK_REFERENCE_UYU_PER_USD = 42;
+
+/**
+ * Tipo de cambio para mezclar UYU y USD en el informe: el de Ajustes, o 42 si hace
+ * falta combinar y no definiste uno (orientativo).
+ */
+export function effectiveReferenceUyuPerUsdForReport(
+  settings: AppSettings,
+  transactions: Transaction[],
+  reportCurrency: CurrencyCode,
+): number | undefined {
+  const fx = settings.referenceUyuPerUsd;
+  if (fx != null && Number.isFinite(fx) && fx > 0) return fx;
+  if (reportCurrency !== "UYU" && reportCurrency !== "USD") return undefined;
+  let hasUyu = false;
+  let hasUsd = false;
+  for (const t of transactions) {
+    if (!countsAsPeriodIncome(t) && !countsAsPeriodExpense(t)) continue;
+    const c = txCurrency(t, settings);
+    if (c === "UYU") hasUyu = true;
+    if (c === "USD") hasUsd = true;
+  }
+  const needsMerge =
+    (reportCurrency === "UYU" && hasUsd) ||
+    (reportCurrency === "USD" && hasUyu) ||
+    (hasUyu && hasUsd);
+  if (!needsMerge) return undefined;
+  return FALLBACK_REFERENCE_UYU_PER_USD;
+}
+
+export function isUsingFallbackReferenceUyuPerUsd(
+  settings: AppSettings,
+  transactions: Transaction[],
+  reportCurrency: CurrencyCode,
+): boolean {
+  const fx = settings.referenceUyuPerUsd;
+  if (fx != null && Number.isFinite(fx) && fx > 0) return false;
+  return (
+    effectiveReferenceUyuPerUsdForReport(
+      settings,
+      transactions,
+      reportCurrency,
+    ) != null
+  );
+}
+
 /**
  * Ingresos y gastos en la moneda del informe. Si hay `referenceUyuPerUsd` y la
  * moneda es UYU o USD, combina UYU + USD con conversión. EUR u otras se suman al
@@ -226,7 +273,11 @@ export function sumIncomeExpenseForReport(
   settings: AppSettings,
   reportCurrency: CurrencyCode,
 ): { income: number; expense: number } {
-  const fx = settings.referenceUyuPerUsd;
+  const fx = effectiveReferenceUyuPerUsdForReport(
+    settings,
+    transactions,
+    reportCurrency,
+  );
   const oi = sumIncomeNonUyuUsd(transactions, settings);
   const oe = sumExpenseNonUyuUsd(transactions, settings);
 
@@ -276,10 +327,16 @@ export function transactionIncomeContributionInReport(
   t: Transaction,
   settings: AppSettings,
   reportCurrency: CurrencyCode,
+  /** Período del informe (misma lista que `sumIncomeExpenseForReport`) para unificar el TC. */
+  periodTransactions?: Transaction[],
 ): number {
   if (!countsAsPeriodIncome(t)) return 0;
   const cur = txCurrency(t, settings);
-  const fx = settings.referenceUyuPerUsd;
+  const fx = effectiveReferenceUyuPerUsdForReport(
+    settings,
+    periodTransactions ?? [t],
+    reportCurrency,
+  );
   const hasFx =
     fx != null &&
     Number.isFinite(fx) &&
@@ -485,6 +542,45 @@ export function debitVsCredit(
     else other += t.amount;
   }
   return { debit, credit, other };
+}
+
+/**
+ * Desglose débito/crédito/efectivo en la moneda del informe, mezclando UYU y USD
+ * como los KPI (no solo la moneda seleccionada en el filtro).
+ */
+export function debitVsCreditForReport(
+  transactions: Transaction[],
+  settings: AppSettings,
+  reportCurrency: CurrencyCode,
+): { debit: number; credit: number; other: number } {
+  const fxEff = effectiveReferenceUyuPerUsdForReport(
+    settings,
+    transactions,
+    reportCurrency,
+  );
+  if (fxEff != null && reportCurrency === "UYU") {
+    const c = combinedExpenseByPaymentReferenceUyu(
+      transactions,
+      settings,
+      fxEff,
+    );
+    if (c) return { debit: c.debit, credit: c.credit, other: c.otherPay };
+  }
+  if (fxEff != null && reportCurrency === "USD") {
+    const c = combinedExpenseByPaymentReferenceUyu(
+      transactions,
+      settings,
+      fxEff,
+    );
+    if (c) {
+      return {
+        debit: c.debit / fxEff,
+        credit: c.credit / fxEff,
+        other: c.otherPay / fxEff,
+      };
+    }
+  }
+  return debitVsCredit(transactions, settings, reportCurrency);
 }
 
 export function pendingTotals(

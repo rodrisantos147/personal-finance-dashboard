@@ -34,8 +34,9 @@ import {
   combinedPeriodTotalsReferenceUyu,
   compareToPreviousPeriod,
   currenciesInUse,
-  debitVsCredit,
+  debitVsCreditForReport,
   estimateFutureIncome,
+  isUsingFallbackReferenceUyuPerUsd,
   filterByDateRange,
   monthlyBuckets,
   pendingTotals,
@@ -149,6 +150,7 @@ export function FinanceDashboard() {
           t,
           settings,
           reportCurrency,
+          slice,
         );
         return {
           id: t.id,
@@ -195,8 +197,13 @@ export function FinanceDashboard() {
   );
 
   const dv = useMemo(
-    () => debitVsCredit(slice, settings, reportCurrency),
+    () => debitVsCreditForReport(slice, settings, reportCurrency),
     [slice, settings, reportCurrency],
+  );
+
+  const usingFallbackFx = useMemo(
+    () => isUsingFallbackReferenceUyuPerUsd(settings, slice, reportCurrency),
+    [settings, slice, reportCurrency],
   );
   const creditShare =
     expense > 0 ? dv.credit / expense : 0;
@@ -546,26 +553,44 @@ export function FinanceDashboard() {
             periodLabel={periodLabelForState}
           />
 
-          <div className="flex flex-wrap items-center gap-3 rounded-xl border border-zinc-800 bg-zinc-900/30 px-4 py-3">
-            <span className="text-xs font-medium text-zinc-500">
-              Moneda del resumen y gráficos
-            </span>
-            <select
-              value={reportCurrency}
-              onChange={(e) =>
-                setReportCurrency(e.target.value as CurrencyCode)
-              }
-              className="rounded-lg border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm text-white"
-            >
-              {REPORT_CURRENCIES.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.label}
-                </option>
-              ))}
-            </select>
-            <span className="text-xs text-zinc-600">
-              Con datos: {usedCurrencies.join(", ") || "—"}
-            </span>
+          <div className="flex flex-col gap-2 rounded-xl border border-zinc-800 bg-zinc-900/30 px-4 py-3">
+            <div className="flex flex-wrap items-center gap-3">
+              <span className="text-xs font-medium text-zinc-500">
+                Moneda del resumen y gráficos
+              </span>
+              <select
+                value={reportCurrency}
+                onChange={(e) =>
+                  setReportCurrency(e.target.value as CurrencyCode)
+                }
+                className="rounded-lg border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm text-white"
+              >
+                {REPORT_CURRENCIES.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.label}
+                  </option>
+                ))}
+              </select>
+              <span className="text-xs text-zinc-600">
+                Con datos: {usedCurrencies.join(", ") || "—"}
+              </span>
+            </div>
+            {usingFallbackFx && (
+              <p className="text-xs leading-relaxed text-amber-100/90">
+                Mezclamos pesos y dólares con un tipo de cambio referencia{" "}
+                <strong className="text-amber-50">42 UYU por USD</strong> porque
+                no cargaste uno en{" "}
+                <button
+                  type="button"
+                  className="underline hover:text-white"
+                  onClick={() => setTab("data")}
+                >
+                  Datos
+                </button>
+                . Los totales son orientativos; cargá tu TC para que coincidan con
+                el banco.
+              </p>
+            )}
           </div>
 
           <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
