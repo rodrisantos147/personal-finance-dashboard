@@ -575,6 +575,14 @@ export function FinanceDashboard() {
                 Con datos: {usedCurrencies.join(", ") || "—"}
               </span>
             </div>
+            {reportCurrency !== "UYU" && (
+              <p className="text-xs text-zinc-500">
+                Los totales del resumen están en la moneda elegida arriba. Para
+                verlos en{" "}
+                <strong className="text-zinc-400">pesos uruguayos</strong>,
+                seleccioná <strong className="text-zinc-400">Pesos (UYU)</strong>.
+              </p>
+            )}
             {usingFallbackFx && (
               <p className="text-xs leading-relaxed text-amber-100/90">
                 Mezclamos pesos y dólares con un tipo de cambio referencia{" "}

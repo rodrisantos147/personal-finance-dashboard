@@ -34,12 +34,17 @@ export function formatMoney(
   currency: CurrencyCode,
   locale: string,
 ) {
-  return new Intl.NumberFormat(locale, {
+  const opts: Intl.NumberFormatOptions = {
     style: "currency",
     currency,
     minimumFractionDigits: 0,
     maximumFractionDigits: 2,
-  }).format(amount);
+  };
+  // El símbolo "$" para UYU se confunde con USD; mostrar el nombre de la moneda.
+  if (currency === "UYU") {
+    opts.currencyDisplay = "name";
+  }
+  return new Intl.NumberFormat(locale, opts).format(amount);
 }
 
 /** Atajo usando ajustes (usa moneda explícita, no la “default” del usuario). */
