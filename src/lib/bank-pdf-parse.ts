@@ -1,6 +1,6 @@
 import type { CsvImportResult, CsvImportPreviewRow } from "./csv-import";
 import {
-  inferCurrencyFromMoneyStrings,
+  inferCurrencyFromDescriptionAndHints,
   parseDateFlexible,
   parseMoneyAR,
 } from "./csv-import";
@@ -47,6 +47,17 @@ function inferYearFromText(text: string): number {
 function looksLikeUyAmount(s: string): boolean {
   const t = s.trim();
   return /^\d{1,3}(\.\d{3})*,\d{2}$/.test(t) || /^\d+,\d{2}$/.test(t);
+}
+
+/** Incluye montos USD típicos en extractos TC (12.99 o 1,234.56). */
+function looksLikeAmountLine(s: string): boolean {
+  const t = s.trim();
+  if (looksLikeUyAmount(t)) return true;
+  return (
+    /^\d+\.\d{2}$/.test(t) ||
+    /^\d{1,3}(,\d{3})*\.\d{2}$/.test(t) ||
+    /^\d{1,3}(\.\d{3})*\.\d{2}$/.test(t)
+  );
 }
 
 function classifyItauUy(desc: string): TransactionType {
@@ -117,19 +128,19 @@ export function parseItauUruguayPdfText(text: string): {
     while (i < lines.length) {
       const L = lines[i];
       if (DD_MON_LINE.test(L)) break;
-      if (looksLikeUyAmount(L)) break;
+      if (looksLikeAmountLine(L)) break;
       if (L.length > 0) descLines.push(L);
       i++;
     }
 
-    if (i >= lines.length || !looksLikeUyAmount(lines[i])) {
+    if (i >= lines.length || !looksLikeAmountLine(lines[i])) {
       skipped++;
       continue;
     }
 
     const description = descLines.join(" ").trim();
     if (shouldSkipItauDescription(description)) {
-      while (i < lines.length && looksLikeUyAmount(lines[i])) {
+      while (i < lines.length && looksLikeAmountLine(lines[i])) {
         i++;
       }
       skipped++;
@@ -139,7 +150,7 @@ export function parseItauUruguayPdfText(text: string): {
     const amountStr1 = lines[i];
     i++;
     let amountStr2: string | undefined;
-    if (i < lines.length && looksLikeUyAmount(lines[i])) {
+    if (i < lines.length && looksLikeAmountLine(lines[i])) {
       amountStr2 = lines[i];
       i++;
     }
@@ -193,13 +204,21 @@ export function parseItauUruguayPdfText(text: string): {
       type = "expense";
     }
 
+    const rowCur: CurrencyCode =
+      inferCurrencyFromDescriptionAndHints(
+        line,
+        description,
+        amountStr1,
+        amountStr2 ?? "",
+      ) ?? "UYU";
+
     rows.push({
       line: i,
       date: d.toISOString(),
       description: descShort,
       type,
       amount,
-      currency: "UYU",
+      currency: rowCur,
       raw: `${line} | ${description} | ${amountStr1}${amountStr2 ? ` | ${amountStr2}` : ""}`,
     });
   }
@@ -220,7 +239,7 @@ function parseSingleLine(line: string, lineNo: number): CsvImportPreviewRow | nu
 
   let amountIdx = -1;
   for (let j = parts.length - 1; j >= 0; j--) {
-    const p = parts[j].replace(/^(ARS|UYU|\$)$/i, "");
+    const p = parts[j].replace(/^(ARS|UYU|USD|US\$|U\$S|\$)$/i, "");
     const n = parseMoneyAR(p);
     if (Number.isFinite(n) && n !== 0) {
       amountIdx = j;
@@ -246,7 +265,8 @@ function parseSingleLine(line: string, lineNo: number): CsvImportPreviewRow | nu
   ) {
     type = "expense";
   }
-  const cur: CurrencyCode = inferCurrencyFromMoneyStrings(t, amountRaw) ?? "UYU";
+  const cur: CurrencyCode =
+    inferCurrencyFromDescriptionAndHints(t, amountRaw) ?? "UYU";
   return {
     line: lineNo,
     date: d.toISOString(),
@@ -289,7 +309,7 @@ function parseDebitCreditLine(line: string, lineNo: number): CsvImportPreviewRow
   if (!d) return null;
 
   const cur: CurrencyCode =
-    inferCurrencyFromMoneyStrings(t, rawDeb, rawCred) ?? "UYU";
+    inferCurrencyFromDescriptionAndHints(t, rawDeb, rawCred) ?? "UYU";
 
   if (absDeb > 0) {
     return {
@@ -351,7 +371,7 @@ export function parseBankStatementPdfText(text: string): CsvImportResult {
       continue;
     }
 
-    const key = `${row.date}-${row.description}-${row.amount}-${row.type}`;
+    const key = `${row.date}-${row.description}-${row.amount}-${row.type}-${row.currency ?? ""}`;
     if (seen.has(key)) {
       skipped++;
       continue;
@@ -370,7 +390,7 @@ export function parseBankStatementPdfText(text: string): CsvImportResult {
     const dedup: CsvImportPreviewRow[] = [];
     const seen2 = new Set<string>();
     for (const r of itau.rows) {
-      const key = `${r.date}-${r.description}-${r.amount}-${r.type}`;
+      const key = `${r.date}-${r.description}-${r.amount}-${r.type}-${r.currency ?? ""}`;
       if (seen2.has(key)) continue;
       seen2.add(key);
       dedup.push(r);

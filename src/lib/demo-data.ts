@@ -182,11 +182,41 @@ export function buildDemoSnapshot(referenceDate: Date = new Date()): DemoSnapsho
       });
       push(16, {
         type: "expense",
-        amount: 42,
+        amount: 4.99,
+        category: "Subscripciones",
+        paymentMethod: "credit",
+        cardId: CARD_MC,
+        description: "Spotify",
+        isPending: false,
+        currency: "USD",
+      });
+      push(17, {
+        type: "expense",
+        amount: 25,
+        category: "Subscripciones",
+        paymentMethod: "credit",
+        cardId: CARD_MC,
+        description: "Replit",
+        isPending: false,
+        currency: "USD",
+      });
+      push(19, {
+        type: "expense",
+        amount: 20,
+        category: "Subscripciones",
+        paymentMethod: "credit",
+        cardId: CARD_MC,
+        description: "Cursor",
+        isPending: false,
+        currency: "USD",
+      });
+      push(21, {
+        type: "expense",
+        amount: 12,
         category: "Servicios",
         paymentMethod: "credit",
         cardId: CARD_MC,
-        description: "Suscripción USD (demo)",
+        description: "Cloudflare",
         isPending: false,
         currency: "USD",
       });
