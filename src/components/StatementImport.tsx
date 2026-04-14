@@ -9,7 +9,10 @@ import {
   type SingleAmountConvention,
 } from "@/lib/csv-import";
 import { formatMoneyWithSettings } from "@/lib/format";
-import { inferOmitFromPeriodSummary } from "@/lib/finance";
+import {
+  inferOmitExpenseFromPeriodSummary,
+  inferOmitFromPeriodSummary,
+} from "@/lib/finance";
 import { extractTextFromPdfFile } from "@/lib/pdf-extract";
 import { useFinanceStore } from "@/lib/store";
 import type { CurrencyCode, PaymentMethod } from "@/lib/types";
@@ -126,7 +129,9 @@ export function StatementImport() {
         paymentMethod: r.type === "expense" ? payExpense : payIncome,
         description: r.description,
         isPending: false,
-        ...(inferOmitFromPeriodSummary(r.type, r.description)
+        ...(r.omitFromPeriodSummary ||
+        inferOmitFromPeriodSummary(r.type, r.description) ||
+        inferOmitExpenseFromPeriodSummary(r.type, r.description)
           ? { omitFromPeriodSummary: true }
           : {}),
       })),
@@ -150,11 +155,14 @@ export function StatementImport() {
         Importar extracto (CSV o PDF)
       </h2>
       <p className="mt-2 text-sm text-zinc-500">
-        Un solo archivo: CSV o PDF con texto. Los PDF de{" "}
-        <strong className="text-zinc-400">Itaú Uruguay</strong> (estado Visa
-        ****8002, resumen cuenta URGP, etc.) se interpretan con un parser
-        dedicado. Si un formato falla, se prueba el otro. Los duplicados se
-        unifican al importar.
+        CSV o PDF con texto. Itaú (Visa, cuenta) usa un parser dedicado. CSV con
+        columnas <strong className="text-zinc-400">tipo</strong> o{" "}
+        <strong className="text-zinc-400">tipo_movimiento</strong> aplican
+        reglas anti doble conteo (pago Visa desde cuenta fuera del resumen;
+        no se importan{" "}
+        <span className="text-zinc-400">transferencia_recibida</span> ni{" "}
+        <span className="text-zinc-400">prestamo_recibido</span>). Duplicados
+        se unifican al importar.
       </p>
 
       <label className="mt-4 block text-sm text-zinc-400">

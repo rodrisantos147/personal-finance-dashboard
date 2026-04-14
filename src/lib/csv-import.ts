@@ -28,6 +28,8 @@ export type CsvImportPreviewRow = {
   amount: number;
   raw?: string;
   currency?: CurrencyCode;
+  /** Fuera del resumen (KPI): pago TC desde cuenta, préstamo ingresado, etc. */
+  omitFromPeriodSummary?: boolean;
 };
 
 export type CsvImportResult =
@@ -187,6 +189,30 @@ function findColumnIndex(
   return undefined;
 }
 
+/**
+ * CSV propios (ingresos_cuenta / finanzas_completas): evitar doble conteo y
+ * movimientos que no son ingreso/gasto real del mes (ver docs en repo).
+ */
+function rodrigoTipoCsvHint(
+  normTipo: string,
+  transactionType: TransactionType,
+): { skipRow: boolean; omitFromPeriodSummary?: boolean } {
+  if (!normTipo) return { skipRow: false };
+  if (
+    normTipo === "prestamorecibido" ||
+    normTipo === "transferenciarecibida"
+  ) {
+    return { skipRow: true };
+  }
+  if (normTipo === "pagotarjeta") {
+    return { skipRow: false, omitFromPeriodSummary: true };
+  }
+  if (normTipo === "prestamo" && transactionType === "income") {
+    return { skipRow: false, omitFromPeriodSummary: true };
+  }
+  return { skipRow: false };
+}
+
 function inferTipo(
   raw: string,
 ): "income" | "expense" | undefined {
@@ -278,6 +304,8 @@ export function parseBankCsv(
     }
 
     const description = String(cells[iDesc] ?? "").trim() || "Sin descripción";
+    const tipoCell =
+      iTipo !== undefined ? String(cells[iTipo] ?? "").trim() : "";
 
     let type: TransactionType;
     let amount = 0;
@@ -308,7 +336,6 @@ export function parseBankCsv(
         skipped++;
         continue;
       }
-      const tipoCell = iTipo !== undefined ? String(cells[iTipo] ?? "").trim() : "";
       const inferred = inferTipo(tipoCell);
       if (inferred) {
         type = inferred;
@@ -341,6 +368,12 @@ export function parseBankCsv(
       type = "expense";
     }
 
+    const rodrigo = rodrigoTipoCsvHint(normHeader(tipoCell), type);
+    if (rodrigo.skipRow) {
+      skipped++;
+      continue;
+    }
+
     const amountParts =
       mode === "deb_cred" && iDeb !== undefined && iCred !== undefined
         ? [
@@ -369,6 +402,9 @@ export function parseBankCsv(
       type,
       amount,
       currency: rowCurrency,
+      ...(rodrigo.omitFromPeriodSummary
+        ? { omitFromPeriodSummary: true }
+        : {}),
     });
   }
 

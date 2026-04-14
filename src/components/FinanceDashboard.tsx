@@ -1,23 +1,7 @@
 "use client";
 
-import {
-  addMonths,
-  endOfMonth,
-  format,
-  startOfDay,
-  startOfMonth,
-  subDays,
-  subMonths,
-} from "date-fns";
-import {
-  CreditCard,
-  LayoutDashboard,
-  Lightbulb,
-  ListTodo,
-  Plus,
-  Settings2,
-  Table2,
-} from "lucide-react";
+import { addMonths, endOfMonth, format, startOfMonth, subMonths } from "date-fns";
+import { Lightbulb, Plus } from "lucide-react";
 import { useMemo, useState, type ReactNode } from "react";
 import {
   Bar,
@@ -30,7 +14,6 @@ import {
   YAxis,
 } from "recharts";
 import {
-  combinedExpenseByPaymentReferenceUyu,
   combinedPeriodTotalsReferenceUyu,
   compareToPreviousPeriod,
   currenciesInUse,
@@ -55,8 +38,6 @@ import { MovementsTable } from "./MovementsTable";
 import { WishlistManager } from "./WishlistManager";
 import { summarizeFinancialState } from "@/lib/financial-state";
 
-type Tab = "overview" | "movements" | "cards" | "wishlist" | "tips" | "data";
-
 /** Muestra variación % con un decimal y signo. */
 function fmtDeltaPct(n: number) {
   if (n === 0) return "0%";
@@ -67,48 +48,17 @@ function fmtDeltaPct(n: number) {
 /** Resumen, gráficos y KPI siempre en pesos uruguayos (incluye USD × TC referencia). */
 const REPORT_CURRENCY = "UYU" as const;
 
-type RangeMode = "month" | "custom" | "rolling";
-type RollingPreset = 30 | 60 | 90 | 365;
-
-const ROLLING_PRESETS: { days: RollingPreset; label: string }[] = [
-  { days: 30, label: "30 días" },
-  { days: 60, label: "60 días" },
-  { days: 90, label: "90 días" },
-  { days: 365, label: "1 año" },
-];
-
 export function FinanceDashboard() {
   const settings = useFinanceStore((s) => s.settings);
   const transactions = useFinanceStore((s) => s.transactions);
   const creditCards = useFinanceStore((s) => s.creditCards);
   const recurringIncomes = useFinanceStore((s) => s.recurringIncomes);
-  const [tab, setTab] = useState<Tab>("overview");
   const [periodMonth, setPeriodMonth] = useState(() => startOfMonth(new Date()));
-  const [rangeMode, setRangeMode] = useState<RangeMode>("month");
-  const [rollingDays, setRollingDays] = useState<RollingPreset>(30);
-  const [customFrom, setCustomFrom] = useState(
-    () => format(startOfMonth(new Date()), "yyyy-MM-dd"),
-  );
-  const [customTo, setCustomTo] = useState(
-    () => format(endOfMonth(new Date()), "yyyy-MM-dd"),
-  );
 
-  const { from, to } = useMemo(() => {
-    if (rangeMode === "month") {
-      return { from: periodMonth, to: endOfMonth(periodMonth) };
-    }
-    if (rangeMode === "rolling") {
-      const end = new Date();
-      return {
-        from: startOfDay(subDays(end, rollingDays - 1)),
-        to: end,
-      };
-    }
-    return {
-      from: new Date(customFrom),
-      to: endOfMonth(new Date(customTo)),
-    };
-  }, [rangeMode, periodMonth, customFrom, customTo, rollingDays]);
+  const { from, to } = useMemo(
+    () => ({ from: periodMonth, to: endOfMonth(periodMonth) }),
+    [periodMonth],
+  );
 
   const slice = useMemo(
     () => filterByDateRange(transactions, from, to),
@@ -151,12 +101,6 @@ export function FinanceDashboard() {
     return combinedPeriodTotalsReferenceUyu(slice, settings, fx);
   }, [slice, settings]);
 
-  const referenceExpenseByPay = useMemo(() => {
-    const fx = settings.referenceUyuPerUsd;
-    if (fx == null || fx <= 0) return null;
-    return combinedExpenseByPaymentReferenceUyu(slice, settings, fx);
-  }, [slice, settings]);
-
   const { pendingIncome, pendingExpense } = useMemo(
     () => pendingTotals(transactions, settings, REPORT_CURRENCY),
     [transactions, settings, REPORT_CURRENCY],
@@ -189,23 +133,13 @@ export function FinanceDashboard() {
 
   const comparison = useMemo(
     () =>
-      compareToPreviousPeriod(
-        transactions,
-        from,
-        to,
-        settings,
-        REPORT_CURRENCY,
-        {
-          alignPreviousToCalendarMonth: rangeMode === "month",
-        },
-      ),
-    [transactions, from, to, settings, REPORT_CURRENCY, rangeMode],
+      compareToPreviousPeriod(transactions, from, to, settings, REPORT_CURRENCY, {
+        alignPreviousToCalendarMonth: true,
+      }),
+    [transactions, from, to, settings, REPORT_CURRENCY],
   );
 
-  const chartAnchor = useMemo(() => {
-    if (rangeMode === "month") return endOfMonth(periodMonth);
-    return endOfMonth(to);
-  }, [rangeMode, periodMonth, to]);
+  const chartAnchor = useMemo(() => endOfMonth(periodMonth), [periodMonth]);
 
   const barData = useMemo(
     () =>
@@ -316,21 +250,21 @@ export function FinanceDashboard() {
 
   return (
     <div className="mx-auto flex min-h-screen max-w-7xl flex-col gap-6 px-4 py-8 pb-24 sm:px-6">
-      <header className="flex flex-col gap-4 border-b border-zinc-800 pb-6 sm:flex-row sm:items-end sm:justify-between">
-        <div>
-          <p className="text-xs font-medium uppercase tracking-widest text-zinc-500">
-            Finanzas personales
-          </p>
-          <h1 className="mt-1 text-2xl font-semibold tracking-tight text-white sm:text-3xl">
-            Dashboard
-          </h1>
-          <p className="mt-2 max-w-xl text-sm text-zinc-400">
-            Importá PDF de <strong className="text-zinc-300">Itaú Uruguay</strong>{" "}
-            (Visa / cuenta): la app detecta movimientos en el texto del
-            extracto. Ingresos, egresos, comparativas y lista de deseos. Los
-            datos quedan en este navegador; respaldo JSON en Datos.
-          </p>
-        </div>
+      <header className="border-b border-zinc-800 pb-6">
+        <h1 className="text-2xl font-semibold tracking-tight text-white sm:text-3xl">
+          Finanzas
+        </h1>
+        <p className="mt-2 max-w-lg text-sm text-zinc-400">
+          Todo en pesos uruguayos. Los datos viven en este navegador; respaldo y
+          tipo de cambio en{" "}
+          <a
+            href="#datos"
+            className="text-zinc-300 underline underline-offset-2 hover:text-white"
+          >
+            Datos
+          </a>
+          .
+        </p>
       </header>
 
       {process.env.NEXT_PUBLIC_SHOW_DEMO_BANNER === "true" && (
@@ -339,346 +273,142 @@ export function FinanceDashboard() {
           className="flex flex-col gap-2 rounded-xl border border-zinc-600 bg-zinc-900/90 px-4 py-3 text-sm text-zinc-300 sm:flex-row sm:items-center sm:justify-between"
         >
           <span>
-            <span className="font-medium text-white">Demo para clientes:</span>{" "}
-            cargá datos ficticios desde Datos para mostrar el producto con
-            gráficas llenas.
+            <span className="font-medium text-white">Demo:</span> dataset de
+            ejemplo en{" "}
+            <a
+              href="#datos"
+              className="font-medium text-white underline underline-offset-2 hover:text-zinc-200"
+            >
+              Datos
+            </a>
+            .
           </span>
-          <button
-            type="button"
-            onClick={() => setTab("data")}
-            className="shrink-0 rounded-lg bg-white px-3 py-1.5 text-xs font-medium text-zinc-950 hover:bg-zinc-200"
-          >
-            Ir a Datos
-          </button>
         </div>
       )}
 
-      <section className="flex flex-col gap-3 rounded-xl border border-zinc-800 bg-zinc-900/50 p-4">
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="text-xs font-medium text-zinc-500">Período</span>
-          <div className="flex flex-wrap rounded-lg border border-zinc-700 bg-zinc-900 p-0.5">
-            <button
-              type="button"
-              onClick={() => setRangeMode("month")}
-              className={cn(
-                "rounded-md px-3 py-1.5 text-xs font-medium transition",
-                rangeMode === "month"
-                  ? "bg-white text-zinc-950"
-                  : "text-zinc-400 hover:text-white",
-              )}
-            >
-              Mes
-            </button>
-            <button
-              type="button"
-              onClick={() => setRangeMode("rolling")}
-              className={cn(
-                "rounded-md px-3 py-1.5 text-xs font-medium transition",
-                rangeMode === "rolling"
-                  ? "bg-white text-zinc-950"
-                  : "text-zinc-400 hover:text-white",
-              )}
-            >
-              Últimos días
-            </button>
-            <button
-              type="button"
-              onClick={() => setRangeMode("custom")}
-              className={cn(
-                "rounded-md px-3 py-1.5 text-xs font-medium transition",
-                rangeMode === "custom"
-                  ? "bg-white text-zinc-950"
-                  : "text-zinc-400 hover:text-white",
-              )}
-            >
-              Rango
-            </button>
-          </div>
+      <section className="rounded-xl border border-zinc-800 bg-zinc-900/50 p-4">
+        <div className="flex flex-wrap items-center gap-3">
+          <span className="text-xs font-medium text-zinc-500">Mes</span>
+          <button
+            type="button"
+            className="rounded-lg border border-zinc-700 px-3 py-2 text-sm text-zinc-200 hover:bg-zinc-800"
+            onClick={() => setPeriodMonth((m) => subMonths(m, 1))}
+          >
+            ←
+          </button>
+          <input
+            type="month"
+            value={format(periodMonth, "yyyy-MM")}
+            onChange={(e) => {
+              const [y, mo] = e.target.value.split("-").map(Number);
+              setPeriodMonth(new Date(y, mo - 1, 1));
+            }}
+            className="rounded-lg border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm text-white"
+          />
+          <button
+            type="button"
+            className="rounded-lg border border-zinc-700 px-3 py-2 text-sm text-zinc-200 hover:bg-zinc-800"
+            onClick={() => setPeriodMonth((m) => addMonths(m, 1))}
+          >
+            →
+          </button>
+          <span className="text-xs text-zinc-500">
+            {format(from, "d MMM yyyy")} — {format(to, "d MMM yyyy")}
+          </span>
         </div>
-        {rangeMode === "month" ? (
-          <div className="flex flex-wrap items-center gap-3">
-            <button
-              type="button"
-              className="rounded-lg border border-zinc-700 px-3 py-2 text-sm text-zinc-200 hover:bg-zinc-800"
-              onClick={() => setPeriodMonth((m) => subMonths(m, 1))}
-            >
-              ← Mes anterior
-            </button>
-            <input
-              type="month"
-              value={format(periodMonth, "yyyy-MM")}
-              onChange={(e) => {
-                const [y, mo] = e.target.value.split("-").map(Number);
-                setPeriodMonth(new Date(y, mo - 1, 1));
-              }}
-              className="rounded-lg border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm text-white"
-            />
-            <button
-              type="button"
-              className="rounded-lg border border-zinc-700 px-3 py-2 text-sm text-zinc-200 hover:bg-zinc-800"
-              onClick={() => setPeriodMonth((m) => addMonths(m, 1))}
-            >
-              Mes siguiente →
-            </button>
-            <span className="text-xs text-zinc-500">
-              {format(from, "d MMM yyyy")} — {format(to, "d MMM yyyy")}
-            </span>
-            <p className="w-full text-xs leading-relaxed text-zinc-500">
-              Con <strong className="text-zinc-400">Mes</strong>, el período de los
-              KPI y tablas es el <strong className="text-zinc-400">mes calendario
-              completo</strong> seleccionado (del 1 al último día de ese mes), no un
-              mes “desde hoy”.
-            </p>
-            {slice.length === 0 && (
-              <p className="w-full text-xs text-amber-200/90">
-                No hay movimientos con fecha en este mes: los totales serán cero.
-                Pasá a otro mes (por ejemplo donde importaste extractos) o cargá
-                movimientos en Movimientos / Datos.
-              </p>
-            )}
-          </div>
-        ) : rangeMode === "rolling" ? (
-          <div className="flex flex-col gap-3">
-            <div className="flex flex-wrap gap-2">
-              {ROLLING_PRESETS.map(({ days, label }) => (
-                <button
-                  key={days}
-                  type="button"
-                  onClick={() => setRollingDays(days)}
-                  className={cn(
-                    "rounded-lg border px-3 py-2 text-sm font-medium transition",
-                    rollingDays === days
-                      ? "border-white bg-white text-zinc-950"
-                      : "border-zinc-700 text-zinc-300 hover:border-zinc-500 hover:text-white",
-                  )}
-                >
-                  {label}
-                </button>
-              ))}
-            </div>
-            <span className="text-xs text-zinc-500">
-              {format(from, "d MMM yyyy")} — {format(to, "d MMM yyyy")} ·{" "}
-              <strong className="text-zinc-400">{rollingDays}</strong> días
-              corridos hasta hoy
-            </span>
-            <p className="text-xs leading-relaxed text-zinc-500">
-              Incluye el día de hoy. La comparación &quot;vs período
-              anterior&quot; en los KPI usa el mismo número de días inmediatamente
-              antes de este.
-            </p>
-          </div>
-        ) : (
-          <div className="flex flex-wrap items-center gap-3">
-            <label className="flex items-center gap-2 text-sm text-zinc-400">
-              Desde
-              <input
-                type="date"
-                value={customFrom}
-                onChange={(e) => setCustomFrom(e.target.value)}
-                className="rounded-lg border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm text-white"
-              />
-            </label>
-            <label className="flex items-center gap-2 text-sm text-zinc-400">
-              Hasta
-              <input
-                type="date"
-                value={customTo}
-                onChange={(e) => setCustomTo(e.target.value)}
-                className="rounded-lg border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm text-white"
-              />
-            </label>
-            <p className="w-full text-xs leading-relaxed text-zinc-500">
-              Con <strong className="text-zinc-400">Rango</strong>, se incluyen
-              movimientos entre la fecha &quot;Desde&quot; y el{" "}
-              <strong className="text-zinc-400">fin del mes</strong> de
-              &quot;Hasta&quot;.
-            </p>
-          </div>
+        {slice.length === 0 && (
+          <p className="mt-3 text-xs text-amber-200/90">
+            No hay movimientos en este mes.
+          </p>
         )}
       </section>
 
-      <nav className="flex flex-wrap gap-2">
-        {(
-          [
-            ["overview", "Resumen", LayoutDashboard],
-            ["movements", "Movimientos", Table2],
-            ["cards", "Tarjetas", CreditCard],
-            ["wishlist", "Lista de deseos", ListTodo],
-            ["tips", "Consejos", Lightbulb],
-            ["data", "Datos", Settings2],
-          ] as const
-        ).map(([id, label, Icon]) => (
-          <button
-            key={id}
-            type="button"
-            onClick={() => setTab(id)}
-            className={cn(
-              "inline-flex items-center gap-2 rounded-full border px-4 py-2 text-sm font-medium transition",
-              tab === id
-                ? "border-white bg-white text-zinc-950"
-                : "border-zinc-700 text-zinc-300 hover:border-zinc-500 hover:text-white",
-            )}
-          >
-            <Icon className="h-4 w-4" />
-            {label}
-          </button>
-        ))}
-      </nav>
+      <section id="resumen" className="scroll-mt-8 space-y-6">
+        <FinancialStateCard
+          state={financialState}
+          periodLabel={periodLabelForState}
+        />
 
-      {tab === "overview" && (
-        <>
-          <FinancialStateCard
-            state={financialState}
-            periodLabel={periodLabelForState}
-          />
-
-          <div className="flex flex-col gap-2 rounded-xl border border-zinc-800 bg-zinc-900/30 px-4 py-3">
-            <p className="text-xs text-zinc-400">
-              <strong className="text-zinc-300">Todo el resumen y los gráficos</strong>{" "}
-              están en <strong className="text-zinc-300">pesos uruguayos</strong>{" "}
-              (los movimientos en USD se convierten con el tipo de referencia en
-              Datos, o 42 si no cargaste uno).
+        <div className="rounded-xl border border-zinc-800 bg-zinc-900/30 px-4 py-3">
+          <p className="text-xs text-zinc-400">
+            Resumen en <strong className="text-zinc-300">pesos uruguayos</strong>.
+            USD se convierten con el tipo de cambio en{" "}
+            <a
+              href="#datos"
+              className="text-zinc-300 underline underline-offset-2 hover:text-white"
+            >
+              Datos
+            </a>{" "}
+            (si no hay, se usa 42).
+          </p>
+          {usingFallbackFx && (
+            <p className="mt-2 text-xs text-amber-100/90">
+              Sin TC en Datos: se usa{" "}
+              <strong className="text-amber-50">42 UYU/USD</strong> como
+              referencia.
             </p>
-            <p className="text-xs text-zinc-600">
-              Monedas en tus datos: {usedCurrencies.join(", ") || "—"}
-            </p>
-            {usingFallbackFx && (
-              <p className="text-xs leading-relaxed text-amber-100/90">
-                Mezclamos pesos y dólares con un tipo de cambio referencia{" "}
-                <strong className="text-amber-50">42 UYU por USD</strong> porque
-                no cargaste uno en{" "}
-                <button
-                  type="button"
-                  className="underline hover:text-white"
-                  onClick={() => setTab("data")}
-                >
-                  Datos
-                </button>
-                . Los totales son orientativos; cargá tu TC para que coincidan con
-                el banco.
-              </p>
-            )}
-          </div>
+          )}
+        </div>
 
-          <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             <Kpi
               label="Ingresos del período"
               value={fmt(income)}
-              hint={
-                rangeMode === "month"
-                  ? `vs mes calendario anterior: ${fmtDeltaPct(comparison.deltaIncomePct)}`
-                  : `vs período anterior (${comparison.prevFrom.toLocaleDateString("es-UY")} — ${comparison.prevTo.toLocaleDateString("es-UY")}): ${fmtDeltaPct(comparison.deltaIncomePct)}`
-              }
+              hint={`vs mes anterior: ${fmtDeltaPct(comparison.deltaIncomePct)}`}
               detail={
-                <div className="space-y-2 text-[11px] leading-snug text-zinc-600">
-                  <p>
-                    Acá suma el <strong className="text-zinc-400">dinero que te
-                    entró</strong> en el período (sueldo, cobros, reintegros…).{" "}
-                    <strong className="text-zinc-400">No es lo que gastaste</strong>
-                    : eso está en la tarjeta &quot;Gastos del período&quot;.
+                incomeAuditLines.length > 0 ? (
+                  <ul className="max-h-28 space-y-1 overflow-y-auto text-left">
+                    {incomeAuditLines.slice(0, 5).map((row) => (
+                      <li
+                        key={row.id}
+                        className="flex items-baseline justify-between gap-2 border-b border-zinc-800/50 py-0.5 text-[11px] last:border-0"
+                      >
+                        <span className="min-w-0 flex-1 truncate text-zinc-500">
+                          {row.desc}
+                        </span>
+                        <span className="shrink-0 tabular-nums text-zinc-400">
+                          {fmt(row.contribution)}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="text-[11px] text-zinc-600">
+                    Sin ingresos en el mes (o excluidos del resumen).
                   </p>
-                  {settings.referenceUyuPerUsd != null &&
-                    settings.referenceUyuPerUsd > 0 &&
-                    usedCurrencies.includes("USD") && (
-                      <p>
-                        Tenés ingresos o movimientos en USD: en este total en pesos
-                        se convierten con tu tipo de referencia en Datos (USD ×{" "}
-                        {settings.referenceUyuPerUsd}), eso puede subir mucho el
-                        número en UYU.
-                      </p>
-                    )}
-                  <p>
-                    No incluye filas marcadas &quot;fuera del resumen&quot; (pagos a
-                    tarjeta / traspasos) en Movimientos.
-                  </p>
-                  <p>
-                    Si un sueldo o traspaso en pesos te aparece multiplicado (como si
-                    fuera en dólares), en Movimientos revisá que esa fila no tenga
-                    moneda <strong className="text-zinc-400">USD</strong> por el texto
-                    del extracto; cambiala a UYU o volvé a importar tras actualizar la
-                    app.
-                  </p>
-                  {incomeAuditLines.length > 0 && (
-                    <div className="border-t border-zinc-800/90 pt-2">
-                      <p className="mb-1.5 font-medium text-zinc-500">
-                        Desglose que suma este total ({incomeAuditLines.length}{" "}
-                        {incomeAuditLines.length === 1 ? "ingreso" : "ingresos"})
-                      </p>
-                      <ul className="max-h-36 space-y-1 overflow-y-auto text-left">
-                        {incomeAuditLines.slice(0, 10).map((row) => (
-                          <li
-                            key={row.id}
-                            className="flex items-baseline justify-between gap-2 border-b border-zinc-800/50 py-1 last:border-0"
-                          >
-                            <span className="min-w-0 flex-1 truncate text-zinc-500">
-                              {row.desc}
-                            </span>
-                            <span className="shrink-0 tabular-nums text-zinc-400">
-                              {fmt(row.contribution)}
-                            </span>
-                          </li>
-                        ))}
-                      </ul>
-                      {incomeAuditLines.length > 10 && (
-                        <p className="mt-1.5 text-[10px] text-zinc-600">
-                          +{incomeAuditLines.length - 10} más — revisá la pestaña
-                          Movimientos filtrando por el mismo período y tipo
-                          Ingreso.
-                        </p>
-                      )}
-                    </div>
-                  )}
-                </div>
+                )
               }
               positive
             />
             <Kpi
               label="Gastos del período"
               value={fmt(expense)}
-              hint={
-                rangeMode === "month"
-                  ? `vs mes calendario anterior: ${fmtDeltaPct(comparison.deltaExpensePct)}`
-                  : `vs período anterior (${comparison.prevFrom.toLocaleDateString("es-UY")} — ${comparison.prevTo.toLocaleDateString("es-UY")}): ${fmtDeltaPct(comparison.deltaExpensePct)}`
-              }
+              hint={`vs mes anterior: ${fmtDeltaPct(comparison.deltaExpensePct)}`}
               detail={
-                <>
-                  <span className="font-medium text-zinc-300">
-                    Tarjetas (débito + crédito): {fmt(cardSpendDebitPlusCredit)}
-                  </span>
-                  <span className="mt-1 block text-zinc-400">
-                    Desglose: débito {fmt(dv.debit)} · crédito {fmt(dv.credit)} ·
-                    efect./transf. {fmt(dv.other)}
-                  </span>
-                  <span className="mt-1.5 block text-[11px] leading-snug text-zinc-600">
-                    El total de tarjetas suma ambos medios. El desglose depende de cómo
-                    cargaste cada movimiento en Movimientos.
-                  </span>
-                </>
+                <span className="text-[11px] text-zinc-500">
+                  Tarjetas: {fmt(cardSpendDebitPlusCredit)} · déb.{" "}
+                  {fmt(dv.debit)} · créd. {fmt(dv.credit)} · otras:{" "}
+                  {fmt(dv.other)}
+                </span>
               }
             />
             <Kpi
               label="Resultado (ingresos − gastos)"
               value={fmt(net)}
-              hint={
-                rangeMode === "month"
-                  ? "Solo movimientos en el mes calendario seleccionado."
-                  : rangeMode === "rolling"
-                    ? `Solo movimientos entre las fechas del bloque «Últimos días» (${rollingDays} días hasta hoy).`
-                    : "Solo movimientos entre las fechas del rango personalizado."
-              }
+              hint="Mes calendario seleccionado."
               positive={net >= 0}
             />
             <Kpi
               label="Pendientes (global)"
               value={`${fmt(pendingIncome)} / ${fmt(pendingExpense)}`}
-              hint="Ingresos y egresos marcados como pendientes"
+              hint="Marcados como pendientes"
             />
           </section>
 
-          {referenceTotals && (
+        {referenceTotals && (
             <div className="rounded-xl border border-dashed border-zinc-600/80 bg-zinc-950/50 px-4 py-3">
               <p className="text-xs font-medium text-zinc-500">
-                Referencia combinada (todo en UYU; USD ×{" "}
+                Referencia UYU (USD ×{" "}
                 {(settings.referenceUyuPerUsd ?? 0).toLocaleString("es-UY", {
                   maximumFractionDigits: 2,
                 })}
@@ -691,94 +421,65 @@ export function FinanceDashboard() {
                 Ingresos {fmtUyu(referenceTotals.income)} · Gastos{" "}
                 {fmtUyu(referenceTotals.expense)}
               </p>
-              {referenceExpenseByPay && (
-                <p className="mt-1 text-xs text-zinc-600">
-                  Tarjetas juntas (equiv. UYU):{" "}
-                  {fmtUyu(
-                    referenceExpenseByPay.debit + referenceExpenseByPay.credit,
-                  )}{" "}
-                  (déb. {fmtUyu(referenceExpenseByPay.debit)} · créd.{" "}
-                  {fmtUyu(referenceExpenseByPay.credit)}) · efect./transf.{" "}
-                  {fmtUyu(referenceExpenseByPay.otherPay)} · total gastos{" "}
-                  {fmtUyu(referenceExpenseByPay.total)}
-                </p>
-              )}
             </div>
           )}
 
-          {!referenceTotals &&
+        {!referenceTotals &&
             usedCurrencies.includes("UYU") &&
             usedCurrencies.includes("USD") && (
               <p className="text-xs text-zinc-600">
-                Tip: en{" "}
-                <button
-                  type="button"
+                <a
+                  href="#datos"
                   className="text-zinc-400 underline hover:text-white"
-                  onClick={() => setTab("data")}
                 >
-                  Datos
-                </button>{" "}
-                podés cargar un tipo de cambio referencia para ver un solo número
-                que suma pesos y dólares (orientativo).
+                  Cargá un tipo de cambio en Datos
+                </a>{" "}
+                para unificar pesos y dólares en un solo total.
               </p>
             )}
 
-          <section className="grid gap-4 lg:grid-cols-2">
+        <section className="grid gap-4 lg:grid-cols-2">
             <div className="rounded-xl border border-zinc-800 bg-zinc-900/40 p-4">
               <h2 className="text-sm font-medium text-zinc-300">
-                Ingresos futuros estimados (hasta fin de mes)
+                Ingresos futuros (hasta fin de mes)
               </h2>
               <p className="mt-3 text-3xl font-semibold text-white">
                 {fmt(future.total)}
               </p>
               <p className="mt-2 text-xs text-zinc-500">
-                Recurrentes: {fmt(future.fromRecurring)} · Pendientes con fecha
-                futura: {fmt(future.fromPending)}
+                Recurrentes {fmt(future.fromRecurring)} · pendientes{" "}
+                {fmt(future.fromPending)}
               </p>
             </div>
             <div className="rounded-xl border border-zinc-800 bg-zinc-900/40 p-4">
               <h2 className="text-sm font-medium text-zinc-300">
-                Superávit proyectado (referencia para compras)
+                Superávit proyectado
               </h2>
               <p className="mt-3 text-3xl font-semibold text-white">
                 {fmt(projectedSurplus)}
               </p>
               <p className="mt-2 text-xs text-zinc-500">
-                Período actual neto + pendientes + ingresos futuros estimados.
-                Es orientativo.
+                Neto del mes + pendientes + ingresos futuros (orientativo).
               </p>
             </div>
           </section>
 
-          <section className="rounded-xl border border-zinc-800 bg-zinc-900/40 p-4">
-            <h2 className="mb-4 text-sm font-medium text-zinc-300">
-              Últimos 6 meses — ingresos vs gastos
+        <section className="rounded-xl border border-zinc-800 bg-zinc-900/40 p-4">
+            <h2 className="mb-3 text-sm font-medium text-zinc-300">
+              Últimos 6 meses
             </h2>
             <p className="mb-3 text-xs text-zinc-600">
-              Todos los montos en{" "}
-              <strong className="text-zinc-400">pesos uruguayos</strong>
-              {settings.referenceUyuPerUsd != null &&
-              settings.referenceUyuPerUsd > 0
-                ? " (UYU y USD del período combinados con el tipo de referencia en Datos)."
-                : " (solo filas en pesos si no definís tipo de cambio; USD no se suman en pesos hasta que cargues uno en Datos)."}{" "}
-              La última barra es el mes que termina en{" "}
+              Pesos uruguayos (USD × TC en Datos si aplica). Última barra:{" "}
               {chartAnchor.toLocaleDateString("es-UY", {
                 month: "long",
                 year: "numeric",
               })}
-              .{" "}
-              {rangeMode === "month"
-                ? "Coincide con el mes elegido en «Mes»."
-                : rangeMode === "rolling"
-                  ? "El gráfico sigue siendo por mes calendario (6 meses); el resumen de KPI usa solo los últimos días elegidos arriba."
-                  : "Con «Rango» personalizado, el gráfico sigue mostrando meses completos hasta el fin del mes de «Hasta»."}
+              .
             </p>
             {barChartScaleNote && (
               <p className="mb-3 rounded-lg border border-amber-900/40 bg-amber-950/20 px-3 py-2 text-xs text-amber-100/90">
-                Este mes los totales son mucho menores que en meses anteriores: en
-                el gráfico la última barra puede verse casi invisible frente a la
-                escala. No es un error de cálculo: solo cambió el volumen vs meses
-                pasados.
+                Este mes el volumen es muy bajo respecto a meses anteriores: la
+                última barra puede verse casi invisible.
               </p>
             )}
             <div className="h-72 w-full min-h-[288px] min-w-0">
@@ -805,84 +506,46 @@ export function FinanceDashboard() {
             </div>
           </section>
 
-          <ExpensesConsumosPanel slice={slice} settings={settings} />
+        <ExpensesConsumosPanel slice={slice} settings={settings} />
+      </section>
 
-          <section className="rounded-xl border border-zinc-800 bg-zinc-900/40 p-4">
-            <h2 className="mb-2 text-sm font-medium text-zinc-300">
-              Gastos del período por medio de pago
-            </h2>
-            <p className="mb-4 text-xs text-zinc-600">
-              Misma moneda del resumen. Tarjetas = débito + crédito juntos; abajo el
-              desglose. La suma de las tres filas inferiores coincide con el total de
-              gastos ({fmt(expense)}).
-            </p>
-            <div className="mb-4 rounded-lg border border-zinc-700 bg-zinc-950/50 px-4 py-3">
-              <p className="text-xs font-medium uppercase tracking-wide text-zinc-500">
-                Con tarjeta (débito + crédito)
-              </p>
-              <p className="mt-1 text-2xl font-semibold text-white">
-                {fmt(cardSpendDebitPlusCredit)}
-              </p>
-              <p className="mt-1 text-xs text-zinc-500">
-                Desglose: débito {fmt(dv.debit)} · crédito {fmt(dv.credit)}
-              </p>
-            </div>
-            <div className="grid gap-4 sm:grid-cols-3">
-              <div>
-                <p className="text-xs text-zinc-500">Solo tarjeta débito</p>
-                <p className="text-xl font-semibold">{fmt(dv.debit)}</p>
-              </div>
-              <div>
-                <p className="text-xs text-zinc-500">Solo tarjeta crédito</p>
-                <p className="text-xl font-semibold">{fmt(dv.credit)}</p>
-              </div>
-              <div>
-                <p className="text-xs text-zinc-500">Efectivo / transferencia</p>
-                <p className="text-xl font-semibold">{fmt(dv.other)}</p>
-              </div>
-            </div>
-          </section>
-        </>
-      )}
+      <section id="movimientos" className="scroll-mt-24 space-y-4 pt-12">
+        <h2 className="text-lg font-semibold text-white">Movimientos</h2>
+        <MovementsTable periodFrom={from} periodTo={to} />
+      </section>
 
-      {tab === "movements" && <MovementsTable periodFrom={from} periodTo={to} />}
+      <section id="tarjetas" className="scroll-mt-24 space-y-4 pt-12">
+        <h2 className="text-lg font-semibold text-white">Tarjetas</h2>
+        <CreditCardsManager />
+      </section>
 
-      {tab === "cards" && <CreditCardsManager />}
-
-      {tab === "wishlist" && (
+      <section id="deseos" className="scroll-mt-24 pt-12">
         <WishlistManager periodFrom={from} periodTo={to} />
-      )}
+      </section>
 
-      {tab === "tips" && (
-        <section className="space-y-4">
-          <div className="rounded-xl border border-zinc-800 bg-zinc-900/40 p-6">
-            <h2 className="flex items-center gap-2 text-lg font-medium text-white">
-              <Lightbulb className="h-5 w-5" />
-              Consejos según tus números
-            </h2>
-            <ul className="mt-4 list-disc space-y-3 pl-5 text-sm text-zinc-300">
-              {tips.map((t) => (
-                <li key={t}>{t}</li>
-              ))}
-            </ul>
-          </div>
-          <div className="rounded-xl border border-dashed border-zinc-700 bg-zinc-900/20 p-4 text-sm text-zinc-500">
-            Nada aquí reemplaza asesoramiento profesional. Ajustá categorías y
-            cargá cierres de tarjeta para alertas más útiles.
-          </div>
-        </section>
-      )}
+      <section id="consejos" className="scroll-mt-24 space-y-4 pt-12">
+        <h2 className="flex items-center gap-2 text-lg font-semibold text-white">
+          <Lightbulb className="h-5 w-5 shrink-0" aria-hidden />
+          Consejos
+        </h2>
+        <div className="rounded-xl border border-zinc-800 bg-zinc-900/40 p-4">
+          <ul className="list-disc space-y-2 pl-5 text-sm text-zinc-300">
+            {tips.map((t) => (
+              <li key={t}>{t}</li>
+            ))}
+          </ul>
+        </div>
+      </section>
 
-      {tab === "data" && <DataBackup />}
+      <section id="datos" className="scroll-mt-24 space-y-4 pt-12">
+        <h2 className="text-lg font-semibold text-white">Datos</h2>
+        <DataBackup />
+      </section>
 
       <a
         href="#add"
-        onClick={(e) => {
-          e.preventDefault();
-          setTab("movements");
-        }}
         className="fixed bottom-6 right-6 flex h-14 w-14 items-center justify-center rounded-full bg-white text-zinc-950 shadow-lg shadow-black/40 hover:bg-zinc-200"
-        title="Ir a movimientos"
+        title="Agregar movimiento"
       >
         <Plus className="h-7 w-7" />
       </a>

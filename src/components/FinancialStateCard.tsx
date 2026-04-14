@@ -84,9 +84,8 @@ export function FinancialStateCard({
             </ul>
           )}
           <p className="mt-3 text-[11px] text-zinc-600">
-            Ingresos, gastos y proyección están en{" "}
-            <strong className="font-medium text-zinc-500">pesos uruguayos</strong>
-            ; los movimientos en USD se unifican con el tipo de cambio en Datos.
+            Montos en <strong className="font-medium text-zinc-500">pesos</strong>
+            ; USD con tipo de cambio en Datos.
           </p>
         </div>
       </div>

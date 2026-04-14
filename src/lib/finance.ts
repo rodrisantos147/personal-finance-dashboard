@@ -162,6 +162,19 @@ export function inferOmitFromPeriodSummary(
   );
 }
 
+/**
+ * Pago de la Visa desde la cuenta corriente (p. ej. DEB. VARIOS VISA-ILINK): no es
+ * un gasto “nuevo” si ya cargaste los consumos en el extracto de la tarjeta.
+ */
+export function inferOmitExpenseFromPeriodSummary(
+  type: TransactionType,
+  description: string,
+): boolean {
+  if (type !== "expense") return false;
+  const d = description.trim().toUpperCase();
+  return /DEB\.?\s+VARIOS\s+VISA|VISA-ILINK/i.test(d);
+}
+
 export function sumIncome(
   transactions: Transaction[],
   settings: AppSettings,
